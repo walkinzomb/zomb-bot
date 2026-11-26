@@ -141,7 +141,7 @@ if (action === "untrust") {
 
   if (!userId) {
     return message.reply("Usage: `~an untrust @user` or `~an untrust USER_ID`");
-  }
+  });
 
   const trustedUser = await client.users.fetch(userId).catch(() => null);
 
