@@ -298,6 +298,35 @@ client.on("messageCreate", async message => {
     return message.reply({ embeds: [embed] });
   }
 
+  // ENABLE ANTI-NUKE
+  if (action === "enable") {
+    antiNukeData.enabled[guildId] = true;
+    saveAntiNukeData();
+
+    return message.reply(
+      " ** Anti-Nuke Enabled**\nProtection is now active."
+    );
+  }
+
+  // DISABLE ANTI-NUKE
+  if (action === "disable") {
+    antiNukeData.enabled[guildId] = false;
+    saveAntiNukeData();
+
+    return message.reply(
+      "⚠️ **ZOMB Anti-Nuke Disabled**\nProtection is now inactive."
+    );
+  }
+
+  // ANTI-NUKE STATUS
+  if (action === "status") {
+    const enabled = antiNukeData.enabled[guildId] === true;
+
+    return message.reply(
+      ` ** Anti-Nuke:** ${enabled ? "ENABLED" : "DISABLED"}`
+    );
+  }
+
   // HELP MENU
   return message.reply(
     "**ZOMB ANTINUKE COMMANDS**\n\n" +
