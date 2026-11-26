@@ -101,43 +101,59 @@ loadAntiNukeData();
 const ANTI_NUKE_LIMITS = {
   channelDelete: { max: 1, windowMs: 10000 },
   channelCreate: { max: 2, windowMs: 10000 },
-
   roleDelete: { max: 1, windowMs: 10000 },
   roleCreate: { max: 4, windowMs: 10000 },
   roleUpdate: { max: 2, windowMs: 10000 },
-
-  channelPermissionChange: {
-    max: 2,
-    windowMs: 10000
-  },
-
+  channelPermissionChange: { max: 2, windowMs: 10000 },
   memberKick: { max: 2, windowMs: 10000 },
   memberBan: { max: 1, windowMs: 10000 },
   botAdd: { max: 1, windowMs: 10000 },
-
   webhookCreate: { max: 2, windowMs: 10000 },
   webhookDelete: { max: 1, windowMs: 10000 },
   webhookUpdate: { max: 3, windowMs: 10000 },
-
   guildUpdate: { max: 1, windowMs: 10000 }
 };
 
 const actionTracker = new Map();
 const processedAuditEntries = new Set();
 
+// ==========================================
+// ANTI-SPAM SETTINGS
+// ==========================================
+
 const spamTracker = new Map();
 const spamAlertCooldown = new Map();
+
+const SPAM_LIMIT = 5;
+const SPAM_WINDOW_MS = 5000;
+const SPAM_COOLDOWN_MS = 30000;
+
+// ==========================================
+// ANTI-LINK SETTINGS
+// ==========================================
+
 const linkTracker = new Map();
 const linkAlertCooldown = new Map();
 
 const LINK_LIMIT = 1;
 const LINK_WINDOW_MS = 10000;
 const LINK_COOLDOWN_MS = 30000;
-const SPAM_LIMIT = 5;
-const SPAM_WINDOW_MS = 5000;
-const SPAM_COOLDOWN_MS = 30000;
 
-// Dangerous permissions that should be monitored
+// ==========================================
+// ANTI-RAID SETTINGS
+// ==========================================
+
+const raidTracker = new Map();
+const raidAlertCooldown = new Map();
+
+const RAID_LIMIT = 5;
+const RAID_WINDOW_MS = 10000;
+const RAID_COOLDOWN_MS = 60000;
+
+// ==========================================
+// DANGEROUS PERMISSIONS
+// ==========================================
+
 const DANGEROUS_PERMISSIONS = [
   PermissionsBitField.Flags.Administrator,
   PermissionsBitField.Flags.ManageGuild,
@@ -160,144 +176,11 @@ function addedDangerousPermission(oldRole, newRole) {
   );
 }
 
-async function checkAntiSpam(message) {
-  if (!message.guild || message.author.bot) return;
-
-  const guildId = message.guild.id;
-  const userId = message.author.id;
-if (antiNukeData.enabled[guildId] !== true) return;
-  if (userId === message.guild.ownerId) return;
-
-  const trusted =
-    antiNukeData.trusted[guildId] || [];
-
-  if (trusted.includes(userId)) return;
-
-  const key = `${guildId}:${userId}`;
-  const now = Date.now();
-
-  const timestamps = (
-    spamTracker.get(key) || []
-  ).filter(time =>
-    now - time < SPAM_WINDOW_MS
-  );
-
-  timestamps.push(now);
-  spamTracker.set(key, timestamps);
-
-  if (timestamps.length < SPAM_LIMIT) return;
-
-  const lastAlert = spamAlertCooldown.get(key) || 0;
-
-  if (now - lastAlert < SPAM_COOLDOWN_MS) return;
-
-  spamAlertCooldown.set(key, now);
-
-  const detectedLinks = links
-  .slice(0, 5)
-  .map(link => link.replace(/`/g, ""))
-  .join("\n");
-
-await sendAntiNukeLog(
-  message.guild,
-  "ANTI-LINK SPAM ALERT",
-  `**Member:** ${message.author.tag}\n` +
-  `**User ID:** ${userId}\n` +
-  `**Link messages:** ${timestamps.length} in 10 seconds\n` +
-  `**Link posted:**\n\`\`\`\n${detectedLinks.slice(0, 900)}\n\`\`\`\n` +
-  "**Action:** Repeated link messages detected. No automatic deletion or punishment."
-);
-}
-async function checkAntiLink(message) {
-  if (!message.guild || message.author.bot) return;
-
-  const guildId = message.guild.id;
-  const userId = message.author.id;
-
-  if (antiNukeData.enabled[guildId] !== true) return;
-  if (userId === message.guild.ownerId) return;
-
-  const trusted = antiNukeData.trusted[guildId] || [];
-  if (trusted.includes(userId)) return;
-
-  const linkRegex = /https?:\/\/\S+|www\.\S+|discord\.gg\/\S+|discord\.com\/invite\/\S+/gi;
-  const links = message.content.match(linkRegex);
-
-  if (!links) return;
-
-  const key = `${guildId}:${userId}`;
-  const now = Date.now();
-
-  const timestamps = (linkTracker.get(key) || [])
-    .filter(time => now - time < LINK_WINDOW_MS);
-
-  timestamps.push(now);
-  linkTracker.set(key, timestamps);
-
-  if (timestamps.length < LINK_LIMIT) return;
-
-  const lastAlert = linkAlertCooldown.get(key) || 0;
-  if (now - lastAlert < LINK_COOLDOWN_MS) return;
-
-  linkAlertCooldown.set(key, now);
-
-  const detectedLinks = links.slice(0, 5).join(", ");
-
-await sendAntiNukeLog(
-  message.guild,
-  "ANTI-LINK SPAM ALERT",
-  "**Member:** " + message.author.tag + "\n" +
-  "**User ID:** " + userId + "\n" +
-  "**Link messages:** " + timestamps.length + " in 10 seconds\n" +
-  "**Link posted:** " + detectedLinks.slice(0, 900) + "\n" +
-  "**Action:** Repeated link messages detected. No automatic deletion or punishment."
-);
-}
-async function checkAntiInvite(message) {
-  if (!message.guild || message.author.bot) return;
-
-  const guildId = message.guild.id;
-  const userId = message.author.id;
-
-  if (antiNukeData.enabled[guildId] !== true) return;
-  if (userId === message.guild.ownerId) return;
-
-  const trusted = antiNukeData.trusted[guildId] || [];
-  if (trusted.includes(userId)) return;
-
-  const inviteRegex = /(?:https?:\/\/)?(?:www\.)?(?:discord\.gg|discord(?:app)?\.com\/invite)\/[A-Za-z0-9-]+/gi;
-  const invites = message.content.match(inviteRegex);
-
-  if (!invites) return;
-
-  let deleteStatus = "Failed - check Manage Messages permission";
-
-  try {
-    await message.delete();
-    deleteStatus = "Successfully deleted";
-  } catch (error) {
-    console.error("[ZOMB ANTI-INVITE DELETE ERROR]", error);
-  }
-
-  await sendAntiNukeLog(
-    message.guild,
-    "ANTI-INVITE DETECTED",
-    "**Member:** " + message.author.tag + "\n" +
-    "**User ID:** " + userId + "\n" +
-    "**Invite posted:** " + invites.join(", ").slice(0, 900) + "\n" +
-    "**Message deletion:** " + deleteStatus
-  );
-}
 // ==========================================
 // LOGGING
 // ==========================================
 
-
-async function sendAntiNukeLog(
-  guild,
-  title,
-  description
-) {
+async function sendAntiNukeLog(guild, title, description) {
   try {
     const channelId =
       antiNukeData.logs?.[guild.id] ||
@@ -320,14 +203,10 @@ async function sendAntiNukeLog(
       .setColor(0x8B0000)
       .setTitle(`ZOMB | ${title}`)
       .setDescription(description)
-      .setFooter({
-        text: "ZOMB ANTINUKE SECURITY"
-      })
+      .setFooter({ text: "ZOMB ANTINUKE SECURITY" })
       .setTimestamp();
 
-    await logChannel.send({
-      embeds: [embed]
-    });
+    await logChannel.send({ embeds: [embed] });
 
     console.log("[ZOMB] Log message sent successfully.");
     return true;
@@ -338,6 +217,186 @@ async function sendAntiNukeLog(
   }
 }
 
+// ==========================================
+// ANTI-SPAM DETECTION
+// ==========================================
+
+async function checkAntiSpam(message) {
+  if (!message.guild || message.author.bot) return;
+
+  const guildId = message.guild.id;
+  const userId = message.author.id;
+
+  if (antiNukeData.enabled[guildId] !== true) return;
+  if (userId === message.guild.ownerId) return;
+
+  const trusted = antiNukeData.trusted[guildId] || [];
+  if (trusted.includes(userId)) return;
+
+  const key = `${guildId}:${userId}`;
+  const now = Date.now();
+
+  const timestamps = (spamTracker.get(key) || [])
+    .filter(time => now - time < SPAM_WINDOW_MS);
+
+  timestamps.push(now);
+  spamTracker.set(key, timestamps);
+
+  if (timestamps.length < SPAM_LIMIT) return;
+
+  const lastAlert = spamAlertCooldown.get(key) || 0;
+  if (now - lastAlert < SPAM_COOLDOWN_MS) return;
+
+  spamAlertCooldown.set(key, now);
+
+  await sendAntiNukeLog(
+    message.guild,
+    "ANTI-SPAM ALERT",
+    `**Member:** ${message.author.tag}\n` +
+    `**User ID:** ${userId}\n` +
+    `**Messages:** ${timestamps.length} in 5 seconds\n` +
+    "**Action:** Spam detected. No automatic punishment."
+  );
+}
+
+// ==========================================
+// ANTI-LINK DETECTION
+// ==========================================
+
+async function checkAntiLink(message) {
+  if (!message.guild || message.author.bot) return;
+
+  const guildId = message.guild.id;
+  const userId = message.author.id;
+
+  if (antiNukeData.enabled[guildId] !== true) return;
+  if (userId === message.guild.ownerId) return;
+
+  const trusted = antiNukeData.trusted[guildId] || [];
+  if (trusted.includes(userId)) return;
+
+  const inviteRegex =
+    /(?:https?:\/\/)?(?:www\.)?(?:discord\.gg|discord(?:app)?\.com\/invite)\/[A-Za-z0-9-]+/gi;
+
+  // Discord invites are handled by Anti-Invite instead.
+  if (inviteRegex.test(message.content)) return;
+
+  const linkRegex =
+    /https?:\/\/\S+|www\.\S+/gi;
+
+  const links = message.content.match(linkRegex);
+  if (!links) return;
+
+  const key = `${guildId}:${userId}`;
+  const now = Date.now();
+
+  const timestamps = (linkTracker.get(key) || [])
+    .filter(time => now - time < LINK_WINDOW_MS);
+
+  timestamps.push(now);
+  linkTracker.set(key, timestamps);
+
+  if (timestamps.length < LINK_LIMIT) return;
+
+  const lastAlert = linkAlertCooldown.get(key) || 0;
+  if (now - lastAlert < LINK_COOLDOWN_MS) return;
+
+  linkAlertCooldown.set(key, now);
+
+  const detectedLinks = links
+    .slice(0, 5)
+    .join(", ")
+    .slice(0, 900);
+
+  await sendAntiNukeLog(
+    message.guild,
+    "ANTI-LINK ALERT",
+    `**Member:** ${message.author.tag}\n` +
+    `**User ID:** ${userId}\n` +
+    `**Link posted:** ${detectedLinks}\n` +
+    "**Action:** Link detected. No automatic deletion or punishment."
+  );
+}
+
+// ==========================================
+// ANTI-INVITE DETECTION
+// ==========================================
+
+async function checkAntiInvite(message) {
+  if (!message.guild || message.author.bot) return;
+
+  const guildId = message.guild.id;
+  const userId = message.author.id;
+
+  if (antiNukeData.enabled[guildId] !== true) return;
+  if (userId === message.guild.ownerId) return;
+
+  const trusted = antiNukeData.trusted[guildId] || [];
+  if (trusted.includes(userId)) return;
+
+  const inviteRegex =
+    /(?:https?:\/\/)?(?:www\.)?(?:discord\.gg|discord(?:app)?\.com\/invite)\/[A-Za-z0-9-]+/gi;
+
+  const invites = message.content.match(inviteRegex);
+  if (!invites) return;
+
+  let deleteStatus = "Failed - check Manage Messages permission";
+
+  try {
+    await message.delete();
+    deleteStatus = "Successfully deleted";
+  } catch (error) {
+    console.error("[ZOMB ANTI-INVITE DELETE ERROR]", error);
+  }
+
+  await sendAntiNukeLog(
+    message.guild,
+    "ANTI-INVITE DETECTED",
+    `**Member:** ${message.author.tag}\n` +
+    `**User ID:** ${userId}\n` +
+    `**Invite posted:** ${invites.join(", ").slice(0, 900)}\n` +
+    `**Message deletion:** ${deleteStatus}`
+  );
+}
+
+// ==========================================
+// ANTI-RAID DETECTION
+// ==========================================
+
+async function checkAntiRaid(member) {
+  if (!member.guild) return;
+
+  const guild = member.guild;
+  const guildId = guild.id;
+
+  if (antiNukeData.enabled[guildId] !== true) return;
+
+  const now = Date.now();
+
+  const timestamps = (raidTracker.get(guildId) || [])
+    .filter(time => now - time < RAID_WINDOW_MS);
+
+  timestamps.push(now);
+  raidTracker.set(guildId, timestamps);
+
+  if (timestamps.length < RAID_LIMIT) return;
+
+  const lastAlert = raidAlertCooldown.get(guildId) || 0;
+
+  if (now - lastAlert < RAID_COOLDOWN_MS) return;
+
+  raidAlertCooldown.set(guildId, now);
+
+  await sendAntiNukeLog(
+    guild,
+    "ANTI-RAID ALERT",
+    `**Server:** ${guild.name}\n` +
+    `**Recent joins:** ${timestamps.length} in 10 seconds\n` +
+    `**Latest member:** ${member.user.tag}\n` +
+    `**User ID:** ${member.id}\n` +
+    "**Action:** Possible join raid detected. No automatic kick or ban."
+  );
+}
 
 // ==========================================
 // ATTACKER PROTECTION
@@ -353,7 +412,6 @@ async function punishAttacker(
   let roleResponse = "Not attempted";
   let banResponse = "Not attempted";
 
-  // Punishment requires separate authorization
   if (antiNukeData.punishment[guild.id] !== true) {
     await sendAntiNukeLog(
       guild,
@@ -373,9 +431,7 @@ async function punishAttacker(
     executorId === client.user.id
   ) return;
 
-  const trusted =
-    antiNukeData.trusted[guild.id] || [];
-
+  const trusted = antiNukeData.trusted[guild.id] || [];
   if (trusted.includes(executorId)) return;
 
   const member = await guild.members
@@ -399,7 +455,6 @@ async function punishAttacker(
     return;
   }
 
-  // Remove manageable roles
   try {
     const removableRoles = member.roles.cache
       .filter(role =>
@@ -408,11 +463,7 @@ async function punishAttacker(
       .map(role => role.id);
 
     if (removableRoles.length > 0) {
-      await member.roles.remove(
-        removableRoles,
-        reason
-      );
-
+      await member.roles.remove(removableRoles, reason);
       roleResponse = "Manageable roles removed";
     } else {
       roleResponse = "No manageable roles";
@@ -422,14 +473,9 @@ async function punishAttacker(
     roleResponse = "Failed";
   }
 
-  // Permanent ban
   try {
-    await guild.members.ban(executorId, {
-      reason
-    });
-
+    await guild.members.ban(executorId, { reason });
     banResponse = "Permanent ban successful";
-
   } catch (error) {
     console.error("[ZOMB BAN ERROR]", error);
     banResponse = "Failed - check permissions";
@@ -458,47 +504,39 @@ async function processAuditEntries(
   targetId = null
 ) {
   try {
-    if (antiNukeData.enabled[guild.id] !== true) {
-      return;
-    }
+    if (antiNukeData.enabled[guild.id] !== true) return;
 
-   // Give Discord time to publish the audit-log entry
-await new Promise(resolve => setTimeout(resolve, 1200));
+    await new Promise(resolve => setTimeout(resolve, 1200));
 
-const logs = await guild.fetchAuditLogs({
-  type: actionType,
-  limit: 20
-});
+    const logs = await guild.fetchAuditLogs({
+      type: actionType,
+      limit: 20
+    });
 
     const now = Date.now();
 
-    
-const entries = [...logs.entries.values()]
-  .filter(entry => {
-    return Boolean(
-      entry.executor &&
-      now - entry.createdTimestamp >= 0 &&
-      now - entry.createdTimestamp <= AUDIT_LOOKBACK_MS &&
-      (
-        !targetId ||
-        entry.target?.id === targetId ||
-        entry.extra?.channel?.id === targetId
-      )
-    );
-  })
-  .sort((a, b) =>
-    a.createdTimestamp - b.createdTimestamp
-  );
-
+    const entries = [...logs.entries.values()]
+      .filter(entry => {
+        return Boolean(
+          entry.executor &&
+          now - entry.createdTimestamp >= 0 &&
+          now - entry.createdTimestamp <= AUDIT_LOOKBACK_MS &&
+          (
+            !targetId ||
+            entry.target?.id === targetId ||
+            entry.extra?.channel?.id === targetId
+          )
+        );
+      })
+      .sort((a, b) =>
+        a.createdTimestamp - b.createdTimestamp
+      );
 
     for (const entry of entries) {
       const uniqueKey = `${guild.id}:${entry.id}`;
 
-      if (processedAuditEntries.has(uniqueKey)) {
-        continue;
-      }
+      if (processedAuditEntries.has(uniqueKey)) continue;
 
-      // Mark before processing to prevent duplicate counting
       processedAuditEntries.add(uniqueKey);
 
       const executorId = entry.executor.id;
@@ -507,38 +545,25 @@ const entries = [...logs.entries.values()]
         executorId === guild.ownerId ||
         executorId === client.user.id ||
         entry.executor.bot
-      ) {
-        continue;
-      }
+      ) continue;
 
-      const trusted =
-        antiNukeData.trusted[guild.id] || [];
-
-      if (trusted.includes(executorId)) {
-        continue;
-      }
+      const trusted = antiNukeData.trusted[guild.id] || [];
+      if (trusted.includes(executorId)) continue;
 
       const limit = ANTI_NUKE_LIMITS[actionName];
-
       if (!limit) continue;
 
       const key =
         `${guild.id}:${executorId}:${actionName}`;
 
-      const timestamps = (
-        actionTracker.get(key) || []
-      ).filter(time =>
-        now - time < limit.windowMs
-      );
+      const timestamps = (actionTracker.get(key) || [])
+        .filter(time => now - time < limit.windowMs);
 
       timestamps.push(now);
       actionTracker.set(key, timestamps);
 
-      if (timestamps.length < limit.max) {
-        continue;
-      }
+      if (timestamps.length < limit.max) continue;
 
-      // Reset after threshold
       actionTracker.set(key, []);
 
       await punishAttacker(
@@ -550,17 +575,13 @@ const entries = [...logs.entries.values()]
       );
     }
 
-    // Prevent unbounded memory growth
     if (processedAuditEntries.size > 5000) {
       processedAuditEntries.clear();
       actionTracker.clear();
     }
 
   } catch (error) {
-    console.error(
-      `[ZOMB AUDIT ERROR] ${actionName}`,
-      error
-    );
+    console.error(`[ZOMB AUDIT ERROR] ${actionName}`, error);
   }
 }
 
@@ -604,13 +625,8 @@ function overwriteSnapshot(channel) {
 client.on("channelUpdate", (oldChannel, newChannel) => {
   if (!newChannel.guild) return;
 
-  const oldSnapshot = JSON.stringify(
-    overwriteSnapshot(oldChannel)
-  );
-
-  const newSnapshot = JSON.stringify(
-    overwriteSnapshot(newChannel)
-  );
+  const oldSnapshot = JSON.stringify(overwriteSnapshot(oldChannel));
+  const newSnapshot = JSON.stringify(overwriteSnapshot(newChannel));
 
   if (oldSnapshot === newSnapshot) return;
 
@@ -645,9 +661,7 @@ client.on("roleCreate", role => {
 });
 
 client.on("roleUpdate", (oldRole, newRole) => {
-  if (!addedDangerousPermission(oldRole, newRole)) {
-    return;
-  }
+  if (!addedDangerousPermission(oldRole, newRole)) return;
 
   processAuditEntries(
     newRole.guild,
@@ -680,10 +694,14 @@ client.on("guildMemberRemove", member => {
 });
 
 // ==========================================
-// BOT ADDITION PROTECTION
+// MEMBER JOIN / BOT ADDITION / ANTI-RAID
 // ==========================================
 
 client.on("guildMemberAdd", member => {
+  checkAntiRaid(member).catch(error => {
+    console.error("[ZOMB ANTI-RAID ERROR]", error);
+  });
+
   if (!member.user.bot) return;
 
   processAuditEntries(
@@ -731,11 +749,9 @@ client.on("webhooksUpdate", async channel => {
   }
 });
 
-
 // ==========================================
 // SERVER SETTINGS PROTECTION
 // ==========================================
-
 
 client.on("guildUpdate", async (oldGuild, newGuild) => {
   const changes = [];
@@ -766,23 +782,17 @@ client.on("guildUpdate", async (oldGuild, newGuild) => {
   );
 });
 
-
 // ==========================================
 // SLASH COMMAND REGISTRATION
 // ==========================================
 
-const rest = new REST({
-  version: "10"
-}).setToken(process.env.DISCORD_TOKEN);
+const rest = new REST({ version: "10" })
+  .setToken(process.env.DISCORD_TOKEN);
 
 async function registerCommands() {
   await rest.put(
-    Routes.applicationCommands(
-      process.env.CLIENT_ID
-    ),
-    {
-      body: commands
-    }
+    Routes.applicationCommands(process.env.CLIENT_ID),
+    { body: commands }
   );
 
   console.log("ZOMB commands registered!");
@@ -825,26 +835,25 @@ client.on("interactionCreate", async interaction => {
 // ==========================================
 
 client.on("messageCreate", async message => {
-    checkAntiSpam(message).catch(error => {
+  checkAntiSpam(message).catch(error => {
     console.error("[ZOMB ANTISPAM ERROR]", error);
   });
-    checkAntiLink(message).catch(error => {
+
+  checkAntiLink(message).catch(error => {
     console.error("[ZOMB ANTILINK ERROR]", error);
   });
+
   checkAntiInvite(message).catch(error => {
-  console.error("[ZOMB ANTI-INVITE ERROR]", error);
-});
+    console.error("[ZOMB ANTI-INVITE ERROR]", error);
+  });
+
   if (!message.guild || message.author.bot) return;
 
   const args = message.content.trim().split(/\s+/);
   const command = args[0].toLowerCase();
 
-  if (
-    command !== "~an" &&
-    command !== "~antinuke"
-  ) return;
+  if (command !== "~an" && command !== "~antinuke") return;
 
-  // OWNER ONLY
   if (message.author.id !== message.guild.ownerId) {
     return message.reply(
       "❌ Only the server owner can manage ZOMB's anti-nuke system."
@@ -860,9 +869,7 @@ client.on("messageCreate", async message => {
 
   const trusted = antiNukeData.trusted[guildId];
 
-  // ========================================
   // TRUST MEMBER
-  // ========================================
 
   if (action === "trust") {
     const userId =
@@ -910,9 +917,7 @@ client.on("messageCreate", async message => {
     return message.reply({ embeds: [embed] });
   }
 
-  // ========================================
   // UNTRUST MEMBER
-  // ========================================
 
   if (action === "untrust") {
     const userId =
@@ -958,9 +963,7 @@ client.on("messageCreate", async message => {
     return message.reply({ embeds: [embed] });
   }
 
-  // ========================================
   // TRUST LIST
-  // ========================================
 
   if (action === "trustlist") {
     if (trusted.length === 0) {
@@ -994,9 +997,7 @@ client.on("messageCreate", async message => {
     return message.reply({ embeds: [embed] });
   }
 
-  // ========================================
   // ENABLE DETECTION
-  // ========================================
 
   if (action === "enable") {
     antiNukeData.enabled[guildId] = true;
@@ -1009,9 +1010,7 @@ client.on("messageCreate", async message => {
     );
   }
 
-  // ========================================
   // DISABLE DETECTION
-  // ========================================
 
   if (action === "disable") {
     antiNukeData.enabled[guildId] = false;
@@ -1022,9 +1021,7 @@ client.on("messageCreate", async message => {
     );
   }
 
-  // ========================================
-  // AUTOMATIC PUNISHMENT CONTROL
-  // ========================================
+  // AUTOMATIC PUNISHMENT
 
   if (action === "punishment") {
     const setting = (args[2] || "").toLowerCase();
@@ -1053,9 +1050,7 @@ client.on("messageCreate", async message => {
     );
   }
 
-  // ========================================
   // STATUS
-  // ========================================
 
   if (action === "status") {
     const enabled =
@@ -1065,67 +1060,65 @@ client.on("messageCreate", async message => {
       antiNukeData.punishment[guildId] === true;
 
     return message.reply(
-      `🛡️ **ZOMB ANTI-NUKE STATUS**\n\n` +
+      `🛡️ **ZOMB SECURITY STATUS**\n\n` +
       `**Detection:** ${enabled ? "ENABLED" : "DISABLED"}\n` +
       `**Automatic Punishment:** ${punishment ? "ENABLED" : "DISABLED"}\n` +
       `**Trusted Members:** ${trusted.length}\n` +
-      `**Logging:** ${antiNukeData.logs[guildId] ? "CONFIGURED" : "DEFAULT CHANNEL"}`
+      `**Logging:** ${antiNukeData.logs[guildId] ? "CONFIGURED" : "DEFAULT CHANNEL"}\n` +
+      `**Anti-Spam:** ${enabled ? "ACTIVE" : "INACTIVE"}\n` +
+      `**Anti-Link:** ${enabled ? "ACTIVE" : "INACTIVE"}\n` +
+      `**Anti-Invite:** ${enabled ? "ACTIVE" : "INACTIVE"}\n` +
+      `**Anti-Raid:** ${enabled ? "ACTIVE" : "INACTIVE"}`
     );
   }
 
-  // ========================================
   // SET LOG CHANNEL
-  // ========================================
 
-  
-if (action === "setlog") {
-  const selectedChannel =
-    message.mentions.channels.first();
+  if (action === "setlog") {
+    const selectedChannel =
+      message.mentions.channels.first();
 
-  const channelId =
-    selectedChannel?.id || LOG_CHANNEL_ID;
+    const channelId =
+      selectedChannel?.id || LOG_CHANNEL_ID;
 
-  const logChannel = await message.guild.channels
-    .fetch(channelId)
-    .catch(() => null);
+    const logChannel = await message.guild.channels
+      .fetch(channelId)
+      .catch(() => null);
 
-  if (
-    !logChannel ||
-    !logChannel.isTextBased() ||
-    !logChannel.send
-  ) {
+    if (
+      !logChannel ||
+      !logChannel.isTextBased() ||
+      !logChannel.send
+    ) {
+      return message.reply(
+        "❌ ZOMB cannot access that logging channel."
+      );
+    }
+
+    antiNukeData.logs[guildId] = channelId;
+    saveAntiNukeData();
+
+    const sent = await sendAntiNukeLog(
+      message.guild,
+      "LOGGING TEST",
+      "ZOMB successfully connected to this security log channel."
+    );
+
+    if (!sent) {
+      return message.reply(
+        "⚠️ Channel saved, but ZOMB could not send the test embed. Check its channel permissions."
+      );
+    }
+
     return message.reply(
-      "❌ ZOMB cannot access that logging channel."
+      `🛡️ Logging configured and tested successfully in ${logChannel}.`
     );
   }
 
-  antiNukeData.logs[guildId] = channelId;
-  saveAntiNukeData();
-
-  const sent = await sendAntiNukeLog(
-    message.guild,
-    "LOGGING TEST",
-    "ZOMB successfully connected to this security log channel."
-  );
-
-  if (!sent) {
-    return message.reply(
-      "⚠️ Channel saved, but ZOMB could not send the test embed. Check its channel permissions."
-    );
-  }
+  // HELP
 
   return message.reply(
-    `🛡️ Logging configured and tested successfully in ${logChannel}.`
-  );
-}
-
-
-  // ========================================
-  // HELP MENU
-  // ========================================
-
-  return message.reply(
-    "**ZOMB ANTINUKE COMMANDS**\n\n" +
+    "**ZOMB SECURITY COMMANDS**\n\n" +
     "`~an trust @user` — Trust a member\n" +
     "`~an trust USER_ID` — Trust by ID\n" +
     "`~an untrust @user` — Remove a trusted member\n" +
@@ -1146,9 +1139,7 @@ if (action === "setlog") {
 // ==========================================
 
 client.once("clientReady", () => {
-  console.log(
-    `ZOMB online as ${client.user.tag}`
-  );
+  console.log(`ZOMB online as ${client.user.tag}`);
 });
 
 // ==========================================
