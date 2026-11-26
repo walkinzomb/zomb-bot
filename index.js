@@ -125,6 +125,13 @@ const ANTI_NUKE_LIMITS = {
 const actionTracker = new Map();
 const processedAuditEntries = new Set();
 
+const spamTracker = new Map();
+const spamAlertCooldown = new Map();
+
+const SPAM_LIMIT = 5;
+const SPAM_WINDOW_MS = 5000;
+const SPAM_COOLDOWN_MS = 30000;
+
 // Dangerous permissions that should be monitored
 const DANGEROUS_PERMISSIONS = [
   PermissionsBitField.Flags.Administrator,
