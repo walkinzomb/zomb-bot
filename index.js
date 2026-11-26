@@ -193,14 +193,20 @@ if (antiNukeData.enabled[guildId] !== true) return;
 
   spamAlertCooldown.set(key, now);
 
-  await sendAntiNukeLog(
-    message.guild,
-    "ANTI-SPAM ALERT",
-    `**Member:** ${message.author.tag}\n` +
-    `**User ID:** ${userId}\n` +
-    `**Messages:** ${timestamps.length} in 5 seconds\n` +
-    "**Action:** Spam detected. No automatic punishment."
-  );
+  const detectedLinks = links
+  .slice(0, 5)
+  .map(link => link.replace(/`/g, ""))
+  .join("\n");
+
+await sendAntiNukeLog(
+  message.guild,
+  "ANTI-LINK SPAM ALERT",
+  `**Member:** ${message.author.tag}\n` +
+  `**User ID:** ${userId}\n` +
+  `**Link messages:** ${timestamps.length} in 10 seconds\n` +
+  `**Link posted:**\n\`\`\`\n${detectedLinks.slice(0, 900)}\n\`\`\`\n` +
+  "**Action:** Repeated link messages detected. No automatic deletion or punishment."
+);
 }
 async function checkAntiLink(message) {
   if (!message.guild || message.author.bot) return;
