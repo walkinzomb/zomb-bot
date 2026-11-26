@@ -103,6 +103,16 @@ async function checkAntiNuke(guild, targetId, actionType, actionName) {
       );
     }
 
+await sendAntiNukeLog(
+  guild,
+  "ATTACK DETECTED",
+  `**User:** ${entry.executor.username}\n` +
+  `**User ID:** ${executorId}\n` +
+  `**Action:** ${actionName}\n` +
+  `**Threshold:** ${limit.max} actions in 10 seconds\n` +
+  `**Response:** 10-minute timeout`
+);
+
   } catch (error) {
     console.error("[ZOMB ANTI-NUKE ERROR]", error);
   }
