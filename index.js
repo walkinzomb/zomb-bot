@@ -695,6 +695,93 @@ client.on("guildMemberRemove", member => {
   );
 });
 
+ // ==========================================
+ // ANTI-BOT PROTECTION
+ // ==========================================
+
+async function checkAntiBot(member) {
+  if (!member.guild || !member.user.bot) return;
+
+  const guild = member.guild;
+  const guildId = guild.id;
+
+  if (antiNukeData.antiBot[guildId] !== true) return;
+
+  await new Promise(resolve => setTimeout(resolve, 1500));
+
+  try {
+    const logs = await guild.fetchAuditLogs({
+      type: AuditLogEvent.BotAdd,
+      limit: 10
+    });
+
+    const entry = [...logs.entries.values()]
+      .filter(entry =>
+        entry.target?.id === member.id &&
+        entry.executor &&
+        Date.now() - entry.createdTimestamp <= 15000
+      )
+      .sort((a, b) =>
+        b.createdTimestamp - a.createdTimestamp
+      )[0];
+
+    if (!entry) {
+      await sendAntiNukeLog(
+        guild,
+        "ANTI-BOT WARNING",
+        `**Bot:** ${member.user.tag}\n` +
+        `**Bot ID:** ${member.id}\n` +
+        "**Action:** Inviter could not be verified. No kick performed."
+      );
+      return;
+    }
+
+    const executorId = entry.executor.id;
+    const trusted = antiNukeData.trusted[guildId] || [];
+
+    if (
+      executorId === guild.ownerId ||
+      trusted.includes(executorId)
+    ) {
+      await sendAntiNukeLog(
+        guild,
+        "AUTHORIZED BOT",
+        `**Bot:** ${member.user.tag}\n` +
+        `**Added by:** ${entry.executor.username}\n` +
+        "**Action:** Allowed to stay."
+      );
+      return;
+    }
+
+    let kickStatus = "Failed";
+
+    try {
+      if (member.kickable) {
+        await member.kick(
+          "ZOMB Anti-Bot: Unauthorized bot"
+        );
+        kickStatus = "Successfully kicked";
+      } else {
+        kickStatus = "Cannot kick - check permissions";
+      }
+    } catch (error) {
+      console.error("[ZOMB ANTI-BOT KICK ERROR]", error);
+    }
+
+    await sendAntiNukeLog(
+      guild,
+      "UNAUTHORIZED BOT DETECTED",
+      `**Bot:** ${member.user.tag}\n` +
+      `**Bot ID:** ${member.id}\n` +
+      `**Added by:** ${entry.executor.username}\n` +
+      `**Action:** ${kickStatus}`
+    );
+
+  } catch (error) {
+    console.error("[ZOMB ANTI-BOT ERROR]", error);
+  }
+}
+
 // ==========================================
 // MEMBER JOIN / BOT ADDITION / ANTI-RAID
 // ==========================================
