@@ -786,10 +786,26 @@ async function checkAntiBot(member) {
 // MEMBER JOIN / BOT ADDITION / ANTI-RAID
 // ==========================================
 
+
 client.on("guildMemberAdd", member => {
   checkAntiRaid(member).catch(error => {
     console.error("[ZOMB ANTI-RAID ERROR]", error);
   });
+
+  if (!member.user.bot) return;
+
+  checkAntiBot(member).catch(error => {
+    console.error("[ZOMB ANTI-BOT ERROR]", error);
+  });
+
+  processAuditEntries(
+    member.guild,
+    AuditLogEvent.BotAdd,
+    "botAdd",
+    member.id
+  );
+});
+
 
   if (!member.user.bot) return;
 
