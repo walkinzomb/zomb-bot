@@ -332,19 +332,24 @@ const logs = await guild.fetchAuditLogs({
 
     const now = Date.now();
 
-    const entries = [...logs.entries.values()]
-      .filter(entry =>
-        entry.executor &&
-        now - entry.createdTimestamp >= 0 &&
-        now - entry.createdTimestamp <= AUDIT_LOOKBACK_MS &&
-        (
-  !targetId ||
-  entry.target?.id === targetId ||
-  entry.extra?.channel?.id === targetId
-)
-      .sort((a, b) =>
-        a.createdTimestamp - b.createdTimestamp
-      );
+    
+const entries = [...logs.entries.values()]
+  .filter(entry => {
+    return Boolean(
+      entry.executor &&
+      now - entry.createdTimestamp >= 0 &&
+      now - entry.createdTimestamp <= AUDIT_LOOKBACK_MS &&
+      (
+        !targetId ||
+        entry.target?.id === targetId ||
+        entry.extra?.channel?.id === targetId
+      )
+    );
+  })
+  .sort((a, b) =>
+    a.createdTimestamp - b.createdTimestamp
+  );
+
 
     for (const entry of entries) {
       const uniqueKey = `${guild.id}:${entry.id}`;
