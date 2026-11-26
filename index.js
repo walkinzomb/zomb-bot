@@ -1,3 +1,5 @@
+const fs = require("fs");
+const path = require("path");
 
 const {
   Client,
@@ -6,9 +8,17 @@ const {
   Routes,
   SlashCommandBuilder
 } = require("discord.js");
-
+const DATA_FILE = process.env.ANTINUKE_FILE ||
+  path.join(__dirname, "antinuke.json");
 const client = new Client({
-  intents: []
+  intents: [
+    GatewayIntentBits.Guilds,
+    GatewayIntentBits.GuildMembers,
+    GatewayIntentBits.GuildModeration,
+    GatewayIntentBits.GuildMessages,
+    GatewayIntentBits.MessageContent,
+    GatewayIntentBits.GuildWebhooks
+  ]
 });
 
 const commands = [
