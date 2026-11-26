@@ -312,10 +312,13 @@ async function processAuditEntries(
       return;
     }
 
-    const logs = await guild.fetchAuditLogs({
-      type: actionType,
-      limit: 20
-    });
+   // Give Discord time to publish the audit-log entry
+await new Promise(resolve => setTimeout(resolve, 1200));
+
+const logs = await guild.fetchAuditLogs({
+  type: actionType,
+  limit: 20
+});
 
     const now = Date.now();
 
