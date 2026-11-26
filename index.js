@@ -98,41 +98,40 @@ client.on("messageCreate", async message => {
 
   const trusted = antiNukeData.trusted[guildId];
 
+  
   if (action === "trust") {
-    if (!target) {
-      return message.reply("Usage: `~an trust @user`");
+    const userId =
+      message.mentions.users.first()?.id ||
+      args[2]?.match(/^\d{17,20}$/)?.[0];
+
+    if (!userId) {
+      return message.reply(
+        "Usage: `~an trust @user` or `~an trust USER_ID`"
+      );
     }
 
-    if (target.bot || target.id === message.author.id) {
-      return message.reply("❌ You cannot trust bots or yourself.");
+    if (userId === message.author.id) {
+      return message.reply("❌ You cannot trust yourself.");
     }
 
-    if (trusted.includes(target.id)) {
+    let trustedUser = message.mentions.users.first();
+
+    if (trustedUser?.bot) {
+      return message.reply("❌ You cannot trust bots.");
+    }
+
+    if (trusted.includes(userId)) {
       return message.reply("⚠️ This member is already trusted.");
     }
 
-    trusted.push(target.id);
+    trusted.push(userId);
     saveAntiNukeData();
 
-    return message.reply(`✅ ${target.tag} has been added to ZOMB's trusted team.`);
+    return message.reply(
+      `<@${userId}> you are now added to the trust team`
+    );
   }
 
-  if (action === "untrust") {
-    if (!target) {
-      return message.reply("Usage: `~an untrust @user`");
-    }
-
-    if (!trusted.includes(target.id)) {
-      return message.reply("❌ This member is not trusted.");
-    }
-
-    antiNukeData.trusted[guildId] =
-      trusted.filter(id => id !== target.id);
-
-    saveAntiNukeData();
-
-    return message.reply(`✅ ${target.tag} has been removed from the trusted team.`);
-  }
 
   if (action === "trustlist") {
     if (trusted.length === 0) {
