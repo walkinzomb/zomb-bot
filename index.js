@@ -735,6 +735,9 @@ client.on("interactionCreate", async interaction => {
 // ==========================================
 
 client.on("messageCreate", async message => {
+    checkAntiSpam(message).catch(error => {
+    console.error("[ZOMB ANTISPAM ERROR]", error);
+  });
   if (!message.guild || message.author.bot) return;
 
   const args = message.content.trim().split(/\s+/);
