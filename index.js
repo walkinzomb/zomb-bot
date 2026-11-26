@@ -596,14 +596,36 @@ client.on("webhooksUpdate", async channel => {
 // SERVER SETTINGS PROTECTION
 // ==========================================
 
-client.on("guildUpdate", (oldGuild, newGuild) => {
-  processAuditEntries(
+
+client.on("guildUpdate", async (oldGuild, newGuild) => {
+  const changes = [];
+
+  if (oldGuild.name !== newGuild.name) {
+    changes.push("Server name changed");
+  }
+
+  if (oldGuild.icon !== newGuild.icon) {
+    changes.push("Server icon changed");
+  }
+
+  if (oldGuild.banner !== newGuild.banner) {
+    changes.push("Server banner changed");
+  }
+
+  if (oldGuild.vanityURLCode !== newGuild.vanityURLCode) {
+    changes.push("Server vanity URL changed");
+  }
+
+  if (changes.length === 0) return;
+
+  await processAuditEntries(
     newGuild,
     AuditLogEvent.GuildUpdate,
     "guildUpdate",
     newGuild.id
   );
 });
+
 
 // ==========================================
 // SLASH COMMAND REGISTRATION
