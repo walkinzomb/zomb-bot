@@ -144,13 +144,20 @@ client.on("messageCreate", async message => {
     );
   }
 
-  return message.reply(
-    "**ZOMB ANTINUKE COMMANDS**\n\n" +
-    "`~an trust @user` — Trust a member\n" +
-    "`~an untrust @user` — Remove a trusted member\n" +
-    "`~an trustlist` — View trusted members"
-  );
+  re
+return message.reply({
+  embeds: [
+    new EmbedBuilder()
+      .setColor(0x8B0000)
+      .setTitle("ZOMB | TRUST SYSTEM")
+      .setDescription(
+        `**${trustedUser.username}** you are now added to the trust team.`
+      )
+      .setFooter({ text: "ZOMB ANTINUKE" })
+      .setTimestamp()
+  ]
 });
+
 
 client.on("interactionCreate", async interaction => {
   if (!interaction.isChatInputCommand()) return;
