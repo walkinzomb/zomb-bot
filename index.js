@@ -45,7 +45,19 @@ let antiNukeData = {
   trusted: {},
   enabled: {}
 };
+// ZOMB ANTI-NUKE DETECTION SETTINGS
+const actionTracker = new Map();
 
+const ANTI_NUKE_LIMITS = {
+  channelDelete: {
+    max: 3,
+    windowMs: 10000
+  },
+  channelCreate: {
+    max: 5,
+    windowMs: 10000
+  }
+};
 function loadAntiNukeData() {
   try {
     if (fs.existsSync(DATA_FILE)) {
