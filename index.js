@@ -155,6 +155,49 @@ function addedDangerousPermission(oldRole, newRole) {
   );
 }
 
+async function checkAntiSpam(message) {
+  if (!message.guild || message.author.bot) return;
+
+  const guildId = message.guild.id;
+  const userId = message.author.id;
+
+  if (userId === message.guild.ownerId) return;
+
+  const trusted =
+    antiNukeData.trusted[guildId] || [];
+
+  if (trusted.includes(userId)) return;
+
+  const key = `${guildId}:${userId}`;
+  const now = Date.now();
+
+  const timestamps = (
+    spamTracker.get(key) || []
+  ).filter(time =>
+    now - time < SPAM_WINDOW_MS
+  );
+
+  timestamps.push(now);
+  spamTracker.set(key, timestamps);
+
+  if (timestamps.length < SPAM_LIMIT) return;
+
+  const lastAlert = spamAlertCooldown.get(key) || 0;
+
+  if (now - lastAlert < SPAM_COOLDOWN_MS) return;
+
+  spamAlertCooldown.set(key, now);
+
+  await sendAntiNukeLog(
+    message.guild,
+    "ANTI-SPAM ALERT",
+    `**Member:** ${message.author.tag}\n` +
+    `**User ID:** ${userId}\n` +
+    `**Messages:** ${timestamps.length} in 5 seconds\n` +
+    "**Action:** Spam detected. No automatic punishment."
+  );
+}
+
 // ==========================================
 // LOGGING
 // ==========================================
