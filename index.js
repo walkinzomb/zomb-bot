@@ -103,23 +103,23 @@ const ANTI_NUKE_LIMITS = {
   channelCreate: { max: 2, windowMs: 10000 },
 
   roleDelete: { max: 1, windowMs: 10000 },
-  roleCreate: { max: 5, windowMs: 10000 },
+  roleCreate: { max: 4, windowMs: 10000 },
   roleUpdate: { max: 2, windowMs: 10000 },
 
   channelPermissionChange: {
-    max: 3,
+    max: 2,
     windowMs: 10000
   },
 
-  memberKick: { max: 3, windowMs: 10000 },
+  memberKick: { max: 2, windowMs: 10000 },
   memberBan: { max: 2, windowMs: 10000 },
   botAdd: { max: 1, windowMs: 10000 },
 
-  webhookCreate: { max: 3, windowMs: 10000 },
-  webhookDelete: { max: 3, windowMs: 10000 },
+  webhookCreate: { max: 2, windowMs: 10000 },
+  webhookDelete: { max: 1, windowMs: 10000 },
   webhookUpdate: { max: 3, windowMs: 10000 },
 
-  guildUpdate: { max: 3, windowMs: 10000 }
+  guildUpdate: { max: 2, windowMs: 10000 }
 };
 
 const actionTracker = new Map();
