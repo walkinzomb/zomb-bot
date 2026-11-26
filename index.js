@@ -9,12 +9,13 @@ const {
   Routes,
   SlashCommandBuilder,
   EmbedBuilder,
-  AuditLogEvent,
-  PermissionsBitField
+  AuditLogEvent
 } = require("discord.js");
 
 const DATA_FILE = process.env.ANTINUKE_FILE ||
   path.join(__dirname, "antinuke.json");
+
+const LOG_CHANNEL_ID = "1575507474709090446";
 
 const client = new Client({
   intents: [
@@ -27,6 +28,7 @@ const client = new Client({
   ]
 });
 
+// SLASH COMMANDS
 const commands = [
   new SlashCommandBuilder()
     .setName("ping")
@@ -41,85 +43,64 @@ const commands = [
     .setContexts(0, 1, 2)
 ].map(command => command.toJSON());
 
+// DATA STORAGE
 let antiNukeData = {
   trusted: {},
-  enabled: {}
+  enabled: {},
+  logs: {}
 };
-// ZOMB ANTI-NUKE DETECTION SETTINGS
-const actionTracker = new Map();
 
-
-
-    const entry = logs.entries.find(log =>
-      log.target?.id === targetId &&
-      Date.now() - log.createdTimestamp < 15000
-    );
-
-    if (!entry || !entry.executor) return;
-
-    const executorId = entry.executor.id;
-
-    // Never punish the server owner
-    if (executorId === guild.ownerId) return;
-
-    // Ignore trusted users
-    const trustedUsers = antiNukeData.trusted[guild.id] || [];
-    if (trustedUsers.includes(executorId)) return;
-
-    const limit = ANTI_NUKE_LIMITS[actionName];
-    if (!limit) return;
-
-    const key = `${guild.id}:${executorId}:${actionName}`;
-    const now = Date.now();
-
-    const timestamps = (actionTracker.get(key) || [])
-      .filter(time => now - time < limit.windowMs);
-
-    timestamps.push(now);
-    actionTracker.set(key, timestamps);
-
-  
-if (timestamps.length < limit.max) return;
-
-actionTracker.set(key, []);
-
-const member = await guild.members.fetch(executorId)
-  .catch(() => null);
-
-let response = "Punishment unsuccessful";
-
-if (member && !member.user.bot && member.bannable) {
-  const reason = `ZOMB Anti-Nuke: Excessive ${actionName} activity`;
-
+function loadAntiNukeData() {
   try {
-    const removableRoles = member.roles.cache
-      .filter(role => role.id !== guild.id && role.editable)
-      .map(role => role.id);
+    if (fs.existsSync(DATA_FILE)) {
+      const saved = JSON.parse(
+        fs.readFileSync(DATA_FILE, "utf8")
+      );
 
-    if (removableRoles.length > 0) {
-      await member.roles.remove(removableRoles, reason);
+      antiNukeData = {
+        trusted: saved.trusted || {},
+        enabled: saved.enabled || {},
+        logs: saved.logs || {}
+      };
     }
-
-    await member.ban({ reason });
-
-    response = "Roles stripped and member permanently banned";
   } catch (error) {
-    console.error("[ZOMB PUNISHMENT ERROR]", error);
-    response = "Punishment failed or partially completed";
+    console.error("[ZOMB DATA ERROR]", error);
   }
 }
 
-await sendAntiNukeLog(
-  guild,
-  "ATTACK DETECTED",
-  `**User:** ${entry.executor.username}\n` +
-  `**User ID:** ${executorId}\n` +
-  `**Action:** ${actionName}\n` +
-  `**Threshold:** ${limit.max} actions in 10 seconds\n` +
-  `**Response:** ${response}`
-);
+function saveAntiNukeData() {
+  try {
+    fs.mkdirSync(path.dirname(DATA_FILE), {
+      recursive: true
+    });
 
+    fs.writeFileSync(
+      DATA_FILE,
+      JSON.stringify(antiNukeData, null, 2)
+    );
+  } catch (error) {
+    console.error("[ZOMB SAVE ERROR]", error);
+  }
+}
 
+loadAntiNukeData();
+
+// ANTI-NUKE LIMITS
+const ANTI_NUKE_LIMITS = {
+  channelDelete: {
+    max: 3,
+    windowMs: 10000
+  },
+
+  channelCreate: {
+    max: 5,
+    windowMs: 10000
+  }
+};
+
+const actionTracker = new Map();
+
+// ANTI-NUKE LOGGING
 async function sendAntiNukeLog(guild, title, description) {
   try {
     const channelId = antiNukeData.logs?.[guild.id];
@@ -136,15 +117,158 @@ async function sendAntiNukeLog(guild, title, description) {
       .setColor(0x8B0000)
       .setTitle(`ZOMB | ${title}`)
       .setDescription(description)
-      .setFooter({ text: "ZOMB ANTINUKE SECURITY" })
+      .setFooter({
+        text: "ZOMB ANTINUKE SECURITY"
+      })
       .setTimestamp();
 
-    await logChannel.send({ embeds: [embed] });
+    await logChannel.send({
+      embeds: [embed]
+    });
+
   } catch (error) {
     console.error("[ZOMB LOG ERROR]", error);
   }
 }
 
+// ANTI-NUKE DETECTION
+async function checkAntiNuke(
+  guild,
+  targetId,
+  actionType,
+  actionName
+) {
+  try {
+    if (antiNukeData.enabled[guild.id] !== true) return;
+
+    await new Promise(resolve =>
+      setTimeout(resolve, 1500)
+    );
+
+    const logs = await guild.fetchAuditLogs({
+      type: actionType,
+      limit: 5
+    });
+
+    const entry = logs.entries.find(log =>
+      log.target?.id === targetId &&
+      log.executor &&
+      Date.now() - log.createdTimestamp < 15000
+    );
+
+    if (!entry) return;
+
+    const executorId = entry.executor.id;
+
+    // Protect server owner and ZOMB itself
+    if (executorId === guild.ownerId) return;
+    if (executorId === client.user.id) return;
+
+    // TRUST TEAM EXEMPTION
+    const trustedUsers =
+      antiNukeData.trusted[guild.id] || [];
+
+    if (trustedUsers.includes(executorId)) return;
+
+    const limit = ANTI_NUKE_LIMITS[actionName];
+    if (!limit) return;
+
+    // TRACK ACTIONS
+    const key = `${guild.id}:${executorId}:${actionName}`;
+    const now = Date.now();
+
+    const timestamps = (actionTracker.get(key) || [])
+      .filter(time => now - time < limit.windowMs);
+
+    timestamps.push(now);
+    actionTracker.set(key, timestamps);
+
+    // Wait until threshold is reached
+    if (timestamps.length < limit.max) return;
+
+    // Reset counter
+    actionTracker.set(key, []);
+
+    const reason =
+      `ZOMB Anti-Nuke: Excessive ${actionName} activity`;
+
+    let roleResponse = "Role removal unsuccessful";
+    let banResponse = "Ban unsuccessful";
+
+    // FETCH ATTACKER
+    const member = await guild.members.fetch(executorId)
+      .catch(() => null);
+
+    // REMOVE MANAGEABLE ROLES
+    if (member) {
+      try {
+        const removableRoles = member.roles.cache
+          .filter(role =>
+            role.id !== guild.id && role.editable
+          )
+          .map(role => role.id);
+
+        if (removableRoles.length > 0) {
+          await member.roles.remove(
+            removableRoles,
+            reason
+          );
+        }
+
+        roleResponse = "Manageable roles removed";
+
+      } catch (error) {
+        console.error(
+          "[ZOMB ROLE REMOVAL ERROR]",
+          error
+        );
+
+        roleResponse = "Role removal failed";
+      }
+    }
+
+    // PERMANENT BAN
+    try {
+      await guild.members.ban(executorId, {
+        reason
+      });
+
+      banResponse = "Permanent ban successful";
+
+    } catch (error) {
+      console.error(
+        "[ZOMB BAN ERROR]",
+        error
+      );
+
+      banResponse = "Ban failed - check permissions";
+    }
+
+    // SECURITY ALERT
+    await sendAntiNukeLog(
+      guild,
+      "ATTACK DETECTED",
+      `**Attacker:** ${entry.executor.username}\n` +
+      `**User ID:** ${executorId}\n` +
+      `**Action:** ${actionName}\n` +
+      `**Threshold:** ${limit.max} actions in 10 seconds\n` +
+      `**Role Removal:** ${roleResponse}\n` +
+      `**Ban Status:** ${banResponse}`
+    );
+
+    console.warn(
+      `[ZOMB ANTINUKE] ${entry.executor.username} triggered protection in ${guild.name}`
+    );
+
+  } catch (error) {
+    console.error(
+      "[ZOMB ANTI-NUKE ERROR]",
+      error
+    );
+  }
+}
+
+// CHANNEL DELETION DETECTION
 client.on("channelDelete", channel => {
   if (!channel.guild) return;
 
@@ -156,6 +280,7 @@ client.on("channelDelete", channel => {
   );
 });
 
+// CHANNEL CREATION DETECTION
 client.on("channelCreate", channel => {
   if (!channel.guild) return;
 
@@ -166,60 +291,45 @@ client.on("channelCreate", channel => {
     "channelCreate"
   );
 });
-const ANTI_NUKE_LIMITS = {
-  channelDelete: {
-    max: 3,
-    windowMs: 10000
-  },
-  channelCreate: {
-    max: 5,
-    windowMs: 10000
-  }
-};
-function loadAntiNukeData() {
-  try {
-    if (fs.existsSync(DATA_FILE)) {
-      antiNukeData = JSON.parse(
-        fs.readFileSync(DATA_FILE, "utf8")
-      );
-    }
-  } catch (error) {
-    console.error("Anti-nuke data loading failed:", error);
-  }
-}
 
-function saveAntiNukeData() {
-  fs.writeFileSync(
-    DATA_FILE,
-    JSON.stringify(antiNukeData, null, 2)
-  );
-}
-
-loadAntiNukeData();
-
-const rest = new REST({ version: "10" })
-  .setToken(process.env.DISCORD_TOKEN);
+// REGISTER SLASH COMMANDS
+const rest = new REST({
+  version: "10"
+}).setToken(process.env.DISCORD_TOKEN);
 
 async function registerCommands() {
   await rest.put(
-    Routes.applicationCommands(process.env.CLIENT_ID),
-    { body: commands }
+    Routes.applicationCommands(
+      process.env.CLIENT_ID
+    ),
+    {
+      body: commands
+    }
   );
+
   console.log("ZOMB commands registered!");
 }
 
+// BOT READY
 client.once("ready", () => {
-  console.log(`ZOMB online as ${client.user.tag}`);
+  console.log(
+    `ZOMB online as ${client.user.tag}`
+  );
 });
 
+// PREFIX COMMANDS
 client.on("messageCreate", async message => {
   if (!message.guild || message.author.bot) return;
 
   const args = message.content.trim().split(/\s+/);
   const command = args[0].toLowerCase();
 
-  if (command !== "~an" && command !== "~antinuke") return;
+  if (
+    command !== "~an" &&
+    command !== "~antinuke"
+  ) return;
 
+  // OWNER ONLY
   if (message.author.id !== message.guild.ownerId) {
     return message.reply(
       "❌ Only the server owner can manage ZOMB's anti-nuke system."
@@ -235,7 +345,7 @@ client.on("messageCreate", async message => {
 
   const trusted = antiNukeData.trusted[guildId];
 
-  // TRUST COMMAND
+  // TRUST MEMBER
   if (action === "trust") {
     const userId =
       message.mentions.users.first()?.id ||
@@ -247,17 +357,24 @@ client.on("messageCreate", async message => {
       );
     }
 
-    const trustedUser = await client.users.fetch(userId).catch(() => null);
+    const trustedUser = await client.users
+      .fetch(userId)
+      .catch(() => null);
 
-    if (!trustedUser || trustedUser.bot ||
-        userId === message.author.id) {
+    if (
+      !trustedUser ||
+      trustedUser.bot ||
+      userId === message.author.id
+    ) {
       return message.reply(
         "❌ Invalid user. You cannot trust bots or yourself."
       );
     }
 
     if (trusted.includes(userId)) {
-      return message.reply("⚠️ This member is already trusted.");
+      return message.reply(
+        "⚠️ This member is already trusted."
+      );
     }
 
     trusted.push(userId);
@@ -269,13 +386,17 @@ client.on("messageCreate", async message => {
       .setDescription(
         `**${trustedUser.username}** you are now added to the trust team.`
       )
-      .setFooter({ text: "ZOMB ANTINUKE" })
+      .setFooter({
+        text: "ZOMB ANTINUKE"
+      })
       .setTimestamp();
 
-    return message.reply({ embeds: [embed] });
+    return message.reply({
+      embeds: [embed]
+    });
   }
 
-  // UNTRUST COMMAND
+  // UNTRUST MEMBER
   if (action === "untrust") {
     const userId =
       message.mentions.users.first()?.id ||
@@ -287,7 +408,9 @@ client.on("messageCreate", async message => {
       );
     }
 
-    const trustedUser = await client.users.fetch(userId).catch(() => null);
+    const trustedUser = await client.users
+      .fetch(userId)
+      .catch(() => null);
 
     if (!trustedUser) {
       return message.reply(
@@ -312,13 +435,17 @@ client.on("messageCreate", async message => {
       .setDescription(
         `**${trustedUser.username}** has been removed from the trust team.`
       )
-      .setFooter({ text: "ZOMB ANTINUKE" })
+      .setFooter({
+        text: "ZOMB ANTINUKE"
+      })
       .setTimestamp();
 
-    return message.reply({ embeds: [embed] });
+    return message.reply({
+      embeds: [embed]
+    });
   }
 
-  // TRUST LIST COMMAND
+  // TRUST LIST
   if (action === "trustlist") {
     if (trusted.length === 0) {
       return message.reply(
@@ -340,27 +467,30 @@ client.on("messageCreate", async message => {
       .setColor(0x8B0000)
       .setTitle("ZOMB | TRUST TEAM")
       .setDescription(
-        usernames.join("\n") || "No available usernames found."
+        usernames.join("\n") ||
+        "No available usernames found."
       )
       .setFooter({
         text: `ZOMB ANTINUKE • ${usernames.length} Trusted Members`
       })
       .setTimestamp();
 
-    return message.reply({ embeds: [embed] });
+    return message.reply({
+      embeds: [embed]
+    });
   }
 
-  // ENABLE ANTI-NUKE
+  // ENABLE PROTECTION
   if (action === "enable") {
     antiNukeData.enabled[guildId] = true;
     saveAntiNukeData();
 
     return message.reply(
-      " ** Anti-Nuke Enabled**\nProtection is now active."
+      "🛡️ **ZOMB Anti-Nuke Enabled**\nProtection is now active."
     );
   }
 
-  // DISABLE ANTI-NUKE
+  // DISABLE PROTECTION
   if (action === "disable") {
     antiNukeData.enabled[guildId] = false;
     saveAntiNukeData();
@@ -370,34 +500,35 @@ client.on("messageCreate", async message => {
     );
   }
 
-  // ANTI-NUKE STATUS
+  // CHECK STATUS
   if (action === "status") {
-    const enabled = antiNukeData.enabled[guildId] === true;
+    const enabled =
+      antiNukeData.enabled[guildId] === true;
 
     return message.reply(
-      ` ** Anti-Nuke:** ${enabled ? "ENABLED" : "DISABLED"}`
+      `🛡️ **Anti-Nuke:** ${enabled ? "ENABLED" : "DISABLED"}`
     );
   }
 
-  // SET ANTI-NUKE LOG CHANNEL
+  // SET LOG CHANNEL
   if (action === "setlog") {
-    const logChannelId = "1575507474709090446";
-
     const logChannel = await message.guild.channels
-      .fetch(logChannelId)
+      .fetch(LOG_CHANNEL_ID)
       .catch(() => null);
 
     if (!logChannel || !logChannel.isTextBased()) {
-      return message.reply(" ZOMB could not find the log channel.");
+      return message.reply(
+        "❌ ZOMB could not find the log channel."
+      );
     }
 
     antiNukeData.logs ||= {};
-    antiNukeData.logs[guildId] = logChannelId;
+    antiNukeData.logs[guildId] = LOG_CHANNEL_ID;
 
     saveAntiNukeData();
 
     return message.reply(
-      " **ZOMB LOG SYSTEM**\nAnti-nuke logs have been connected successfully."
+      "🛡️ **ZOMB LOG SYSTEM**\nAnti-nuke logs connected successfully."
     );
   }
 
@@ -408,17 +539,20 @@ client.on("messageCreate", async message => {
     "`~an trust USER_ID` — Trust by ID\n" +
     "`~an untrust @user` — Remove a trusted member\n" +
     "`~an untrust USER_ID` — Remove by ID\n" +
-    "`~an trustlist` — View trusted members" +
+    "`~an trustlist` — View trusted members\n" +
     "`~an enable` — Enable protection\n" +
-"`~an disable` — Disable protection\n" +
-"`~an status` — Check protection status\n" +
-"`~an setlog` — Configure the anti-nuke log channel\n" +
+    "`~an disable` — Disable protection\n" +
+    "`~an status` — Check protection status\n" +
+    "`~an setlog` — Configure the log channel"
   );
-}); // Correctly closes messageCreate
+});
 
+// START ZOMB
 async function start() {
   await registerCommands();
   await client.login(process.env.DISCORD_TOKEN);
 }
 
-start().catch(console.error);
+start().catch(error => {
+  console.error("[ZOMB START ERROR]", error);
+});
