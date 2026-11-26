@@ -8,7 +8,9 @@ const {
   REST,
   Routes,
   SlashCommandBuilder,
-  EmbedBuilder
+  EmbedBuilder,
+  AuditLogEvent,
+  PermissionsBitField
 } = require("discord.js");
 
 const DATA_FILE = process.env.ANTINUKE_FILE ||
