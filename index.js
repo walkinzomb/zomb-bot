@@ -241,14 +241,17 @@ async function checkAntiLink(message) {
 
   linkAlertCooldown.set(key, now);
 
-  await sendAntiNukeLog(
-    message.guild,
-    "ANTI-LINK SPAM ALERT",
-    `**Member:** ${message.author.tag}\n` +
-    `**User ID:** ${userId}\n` +
-    `**Link messages:** ${timestamps.length} in 10 seconds\n` +
-    "**Action:** Repeated link messages detected. No automatic deletion or punishment."
-  );
+  const detectedLinks = links.slice(0, 5).join(", ");
+
+await sendAntiNukeLog(
+  message.guild,
+  "ANTI-LINK SPAM ALERT",
+  "**Member:** " + message.author.tag + "\n" +
+  "**User ID:** " + userId + "\n" +
+  "**Link messages:** " + timestamps.length + " in 10 seconds\n" +
+  "**Link posted:** " + detectedLinks.slice(0, 900) + "\n" +
+  "**Action:** Repeated link messages detected. No automatic deletion or punishment."
+);
 }
 // ==========================================
 // LOGGING
