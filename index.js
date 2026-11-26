@@ -342,6 +342,28 @@ client.on("messageCreate", async message => {
     );
   }
 
+  // SET ANTI-NUKE LOG CHANNEL
+  if (action === "setlog") {
+    const logChannelId = "1575507474709090446";
+
+    const logChannel = await message.guild.channels
+      .fetch(logChannelId)
+      .catch(() => null);
+
+    if (!logChannel || !logChannel.isTextBased()) {
+      return message.reply(" ZOMB could not find the log channel.");
+    }
+
+    antiNukeData.logs ||= {};
+    antiNukeData.logs[guildId] = logChannelId;
+
+    saveAntiNukeData();
+
+    return message.reply(
+      " **ZOMB LOG SYSTEM**\nAnti-nuke logs have been connected successfully."
+    );
+  }
+
   // HELP MENU
   return message.reply(
     "**ZOMB ANTINUKE COMMANDS**\n\n" +
