@@ -70,7 +70,8 @@ function loadAntiNukeData() {
         trusted: saved.trusted || {},
         enabled: saved.enabled || {},
         logs: saved.logs || {},
-        punishment: saved.punishment || {}
+       punishment: saved.punishment || {},
+antiBot: saved.antiBot || {}
       };
     }
   } catch (error) {
