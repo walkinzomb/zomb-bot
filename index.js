@@ -253,6 +253,41 @@ await sendAntiNukeLog(
   "**Action:** Repeated link messages detected. No automatic deletion or punishment."
 );
 }
+async function checkAntiInvite(message) {
+  if (!message.guild || message.author.bot) return;
+
+  const guildId = message.guild.id;
+  const userId = message.author.id;
+
+  if (antiNukeData.enabled[guildId] !== true) return;
+  if (userId === message.guild.ownerId) return;
+
+  const trusted = antiNukeData.trusted[guildId] || [];
+  if (trusted.includes(userId)) return;
+
+  const inviteRegex = /(?:https?:\/\/)?(?:www\.)?(?:discord\.gg|discord(?:app)?\.com\/invite)\/[A-Za-z0-9-]+/gi;
+  const invites = message.content.match(inviteRegex);
+
+  if (!invites) return;
+
+  let deleteStatus = "Failed - check Manage Messages permission";
+
+  try {
+    await message.delete();
+    deleteStatus = "Successfully deleted";
+  } catch (error) {
+    console.error("[ZOMB ANTI-INVITE DELETE ERROR]", error);
+  }
+
+  await sendAntiNukeLog(
+    message.guild,
+    "ANTI-INVITE DETECTED",
+    "**Member:** " + message.author.tag + "\n" +
+    "**User ID:** " + userId + "\n" +
+    "**Invite posted:** " + invites.join(", ").slice(0, 900) + "\n" +
+    "**Message deletion:** " + deleteStatus
+  );
+}
 // ==========================================
 // LOGGING
 // ==========================================
