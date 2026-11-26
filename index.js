@@ -140,8 +140,8 @@ if (action === "untrust") {
     args[2]?.match(/^\d{17,20}$/)?.[0];
 
   if (!userId) {
-    return message.reply("Usage: `~an untrust @user` or `~an untrust USER_ID`");
-  });
+  return message.reply("Usage: `~an untrust @user` or `~an untrust USER_ID`");
+}
 
   const trustedUser = await client.users.fetch(userId).catch(() => null);
 
