@@ -374,7 +374,8 @@ client.on("messageCreate", async message => {
     "`~an trustlist` — View trusted members" +
     "`~an enable` — Enable protection\n" +
 "`~an disable` — Disable protection\n" +
-"`~an status` — Check protection status\n"
+"`~an status` — Check protection status\n" +
+"`~an setlog` — Configure the anti-nuke log channel\n" +
   );
 }); // Correctly closes messageCreate
 
