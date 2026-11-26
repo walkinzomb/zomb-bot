@@ -48,16 +48,7 @@ let antiNukeData = {
 // ZOMB ANTI-NUKE DETECTION SETTINGS
 const actionTracker = new Map();
 
-async function checkAntiNuke(guild, targetId, actionType, actionName) {
-  try {
-    if (antiNukeData.enabled[guild.id] !== true) return;
 
-    await new Promise(resolve => setTimeout(resolve, 1500));
-
-    const logs = await guild.fetchAuditLogs({
-      type: actionType,
-      limit: 5
-    });
 
     const entry = logs.entries.find(log =>
       log.target?.id === targetId &&
@@ -89,14 +80,33 @@ async function checkAntiNuke(guild, targetId, actionType, actionName) {
 
     // Trigger only once when the threshold is reached
     if (timestamps.length === limit.max) {
-      const member = await guild.members.fetch(executorId).catch(() => null);
+      
+const member = await guild.members.fetch(executorId)
+  .catch(() => null);
 
-      if (!member || member.user.bot || !member.moderatable) return;
+let response = "Punishment unsuccessful";
 
-      await member.timeout(
-        10 * 60 * 1000,
-        `ZOMB Anti-Nuke: Excessive ${actionName} activity`
-      );
+if (member && !member.user.bot && member.bannable) {
+  const reason = `ZOMB Anti-Nuke: Excessive ${actionName} activity`;
+
+  try {
+    const removableRoles = member.roles.cache
+      .filter(role => role.id !== guild.id && role.editable)
+      .map(role => role.id);
+
+    if (removableRoles.length > 0) {
+      await member.roles.remove(removableRoles, reason);
+    }
+
+    await member.ban({ reason });
+
+    response = "All manageable roles stripped and member permanently banned";
+  } catch (error) {
+    console.error("[ZOMB PUNISHMENT ERROR]", error);
+    response = "Punishment partially failed; check bot permissions and role hierarchy";
+  }
+}
+
 
       console.warn(
         `[ZOMB ANTI-NUKE] ${entry.executor.tag} timed out in ${guild.name}`
