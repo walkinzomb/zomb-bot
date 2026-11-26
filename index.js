@@ -99,8 +99,8 @@ loadAntiNukeData();
 // ==========================================
 
 const ANTI_NUKE_LIMITS = {
-  channelDelete: { max: 3, windowMs: 10000 },
-  channelCreate: { max: 5, windowMs: 10000 },
+  channelDelete: { max: 1, windowMs: 10000 },
+  channelCreate: { max: 2, windowMs: 10000 },
 
   roleDelete: { max: 1, windowMs: 10000 },
   roleCreate: { max: 5, windowMs: 10000 },
