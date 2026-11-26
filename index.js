@@ -202,7 +202,48 @@ async function checkAntiSpam(message) {
     "**Action:** Spam detected. No automatic punishment."
   );
 }
+async function checkAntiLink(message) {
+  if (!message.guild || message.author.bot) return;
 
+  const guildId = message.guild.id;
+  const userId = message.author.id;
+
+  if (antiNukeData.enabled[guildId] !== true) return;
+  if (userId === message.guild.ownerId) return;
+
+  const trusted = antiNukeData.trusted[guildId] || [];
+  if (trusted.includes(userId)) return;
+
+  const linkRegex = /https?:\/\/\S+|www\.\S+|discord\.gg\/\S+|discord\.com\/invite\/\S+/gi;
+  const links = message.content.match(linkRegex);
+
+  if (!links) return;
+
+  const key = `${guildId}:${userId}`;
+  const now = Date.now();
+
+  const timestamps = (linkTracker.get(key) || [])
+    .filter(time => now - time < LINK_WINDOW_MS);
+
+  timestamps.push(now);
+  linkTracker.set(key, timestamps);
+
+  if (timestamps.length < LINK_LIMIT) return;
+
+  const lastAlert = linkAlertCooldown.get(key) || 0;
+  if (now - lastAlert < LINK_COOLDOWN_MS) return;
+
+  linkAlertCooldown.set(key, now);
+
+  await sendAntiNukeLog(
+    message.guild,
+    "ANTI-LINK SPAM ALERT",
+    `**Member:** ${message.author.tag}\n` +
+    `**User ID:** ${userId}\n` +
+    `**Link messages:** ${timestamps.length} in 10 seconds\n` +
+    "**Action:** Repeated link messages detected. No automatic deletion or punishment."
+  );
+}
 // ==========================================
 // LOGGING
 // ==========================================
