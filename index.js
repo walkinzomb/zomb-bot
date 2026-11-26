@@ -47,20 +47,20 @@ let antiNukeData = {
 };
 // ZOMB ANTI-NUKE DETECTION SETTINGS
 const actionTracker = new Map();
+
 async function checkAntiNuke(guild, targetId, actionType, actionName) {
   try {
-      // Only protect servers where anti-nuke is enabled
-  if (antiNukeData.enabled[guild.id] !== true) return;
-    // Give Discord time to update its audit log
-    await new Promise(resolve => setTimeout(resolve, 1000));
+    if (antiNukeData.enabled[guild.id] !== true) return;
+
+    await new Promise(resolve => setTimeout(resolve, 1500));
 
     const logs = await guild.fetchAuditLogs({
       type: actionType,
       limit: 5
     });
 
-    const entry = logs.entries.find(
-      log => log.target?.id === targetId &&
+    const entry = logs.entries.find(log =>
+      log.target?.id === targetId &&
       Date.now() - log.createdTimestamp < 15000
     );
 
@@ -68,33 +68,46 @@ async function checkAntiNuke(guild, targetId, actionType, actionName) {
 
     const executorId = entry.executor.id;
 
+    // Never punish the server owner
+    if (executorId === guild.ownerId) return;
+
     // Ignore trusted users
     const trustedUsers = antiNukeData.trusted[guild.id] || [];
     if (trustedUsers.includes(executorId)) return;
 
-    // Track actions by user and server
+    const limit = ANTI_NUKE_LIMITS[actionName];
+    if (!limit) return;
+
     const key = `${guild.id}:${executorId}:${actionName}`;
     const now = Date.now();
-
-    const limit = ANTI_NUKE_LIMITS[actionName];
-
-    if (!limit) return;
 
     const timestamps = (actionTracker.get(key) || [])
       .filter(time => now - time < limit.windowMs);
 
     timestamps.push(now);
     actionTracker.set(key, timestamps);
-if (timestamps.length >= limit.max) {
+
+    // Trigger only once when the threshold is reached
+    if (timestamps.length === limit.max) {
+      const member = await guild.members.fetch(executorId).catch(() => null);
+
+      if (!member || member.user.bot || !member.moderatable) return;
+
+      await member.timeout(
+        10 * 60 * 1000,
+        `ZOMB Anti-Nuke: Excessive ${actionName} activity`
+      );
+
       console.warn(
-        `[ZOMB ANTI-NUKE] ${entry.executor.tag} reached the ${actionName} limit in ${guild.name}`
+        `[ZOMB ANTI-NUKE] ${entry.executor.tag} timed out in ${guild.name}`
       );
     }
-    
+
   } catch (error) {
     console.error("[ZOMB ANTI-NUKE ERROR]", error);
   }
 }
+
 client.on("channelDelete", channel => {
   if (!channel.guild) return;
 
