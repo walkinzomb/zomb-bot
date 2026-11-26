@@ -891,30 +891,48 @@ client.on("messageCreate", async message => {
   // SET LOG CHANNEL
   // ========================================
 
-  if (action === "setlog") {
-    const selectedChannel =
-      message.mentions.channels.first();
+  
+if (action === "setlog") {
+  const selectedChannel =
+    message.mentions.channels.first();
 
-    const channelId =
-      selectedChannel?.id || LOG_CHANNEL_ID;
+  const channelId =
+    selectedChannel?.id || LOG_CHANNEL_ID;
 
-    const logChannel = await message.guild.channels
-      .fetch(channelId)
-      .catch(() => null);
+  const logChannel = await message.guild.channels
+    .fetch(channelId)
+    .catch(() => null);
 
-    if (!logChannel || !logChannel.isTextBased()) {
-      return message.reply(
-        "❌ ZOMB could not find that text channel."
-      );
-    }
-
-    antiNukeData.logs[guildId] = channelId;
-    saveAntiNukeData();
-
+  if (
+    !logChannel ||
+    !logChannel.isTextBased() ||
+    !logChannel.send
+  ) {
     return message.reply(
-      `🛡️ **ZOMB LOG SYSTEM**\nLogging connected to ${logChannel}.`
+      "❌ ZOMB cannot access that logging channel."
     );
   }
+
+  antiNukeData.logs[guildId] = channelId;
+  saveAntiNukeData();
+
+  const sent = await sendAntiNukeLog(
+    message.guild,
+    "LOGGING TEST",
+    "ZOMB successfully connected to this security log channel."
+  );
+
+  if (!sent) {
+    return message.reply(
+      "⚠️ Channel saved, but ZOMB could not send the test embed. Check its channel permissions."
+    );
+  }
+
+  return message.reply(
+    `🛡️ Logging configured and tested successfully in ${logChannel}.`
+  );
+}
+
 
   // ========================================
   // HELP MENU
