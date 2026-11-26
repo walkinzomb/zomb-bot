@@ -47,7 +47,52 @@ let antiNukeData = {
 };
 // ZOMB ANTI-NUKE DETECTION SETTINGS
 const actionTracker = new Map();
+async function checkAntiNuke(guild, targetId, actionType, actionName) {
+  try {
+    // Give Discord time to update its audit log
+    await new Promise(resolve => setTimeout(resolve, 1000));
 
+    const logs = await guild.fetchAuditLogs({
+      type: actionType,
+      limit: 5
+    });
+
+    const entry = logs.entries.find(
+      log => log.target?.id === targetId &&
+      Date.now() - log.createdTimestamp < 15000
+    );
+
+    if (!entry || !entry.executor) return;
+
+    const executorId = entry.executor.id;
+
+    // Ignore trusted users
+    const trustedUsers = antiNukeData.trusted[guild.id] || [];
+    if (trustedUsers.includes(executorId)) return;
+
+    // Track actions by user and server
+    const key = `${guild.id}:${executorId}:${actionName}`;
+    const now = Date.now();
+
+    const limit = ANTI_NUKE_LIMITS[actionName];
+
+    if (!limit) return;
+
+    const timestamps = (actionTracker.get(key) || [])
+      .filter(time => now - time < limit.windowMs);
+
+    timestamps.push(now);
+    actionTracker.set(key, timestamps);
+
+    if (timestamps.length >= limit.max) {
+      console.warn(
+        `[ZOMB ANTI-NUKE] ${entry.executor.tag} reached the ${actionName} limit in ${guild.name}`
+      );
+    }
+  } catch (error) {
+    console.error("[ZOMB ANTI-NUKE ERROR]", error);
+  }
+}
 const ANTI_NUKE_LIMITS = {
   channelDelete: {
     max: 3,
