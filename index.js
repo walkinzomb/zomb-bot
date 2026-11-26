@@ -55,7 +55,8 @@ let antiNukeData = {
   trusted: {},
   enabled: {},
   logs: {},
-  punishment: {}
+  punishment: {},
+  antiBot: {}
 };
 
 function loadAntiNukeData() {
