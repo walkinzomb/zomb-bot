@@ -83,12 +83,12 @@ async function checkAntiNuke(guild, targetId, actionType, actionName) {
 
     timestamps.push(now);
     actionTracker.set(key, timestamps);
-
-    if (timestamps.length >= limit.max) {
+if (timestamps.length >= limit.max) {
       console.warn(
         `[ZOMB ANTI-NUKE] ${entry.executor.tag} reached the ${actionName} limit in ${guild.name}`
       );
     }
+    
   } catch (error) {
     console.error("[ZOMB ANTI-NUKE ERROR]", error);
   }
