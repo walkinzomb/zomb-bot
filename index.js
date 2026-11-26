@@ -99,7 +99,7 @@ const ANTI_NUKE_LIMITS = {
 };
 
 const actionTracker = new Map();
-
+const processedAuditEntries = new Set();
 // ANTI-NUKE LOGGING
 async function sendAntiNukeLog(guild, title, description) {
   try {
