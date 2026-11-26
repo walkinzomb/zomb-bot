@@ -127,7 +127,12 @@ const processedAuditEntries = new Set();
 
 const spamTracker = new Map();
 const spamAlertCooldown = new Map();
+const linkTracker = new Map();
+const linkAlertCooldown = new Map();
 
+const LINK_LIMIT = 1;
+const LINK_WINDOW_MS = 10000;
+const LINK_COOLDOWN_MS = 30000;
 const SPAM_LIMIT = 5;
 const SPAM_WINDOW_MS = 5000;
 const SPAM_COOLDOWN_MS = 30000;
