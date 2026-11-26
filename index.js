@@ -133,6 +133,44 @@ client.on("messageCreate", async message => {
   }
 
 
+if (action === "untrust") {
+  const userId =
+    message.mentions.users.first()?.id ||
+    args[2]?.match(/^\d{17,20}$/)?.[0];
+
+  if (!userId) {
+    return message.reply(
+      "Usage: `~an untrust @user` or `~an untrust USER_ID`"
+    );
+  }
+
+  const trustedUser = await client.users.fetch(userId).catch(() => null);
+
+  if (!trustedUser) {
+    return message.reply("❌ Could not find that Discord user.");
+  }
+
+  if (!trusted.includes(userId)) {
+    return message.reply("⚠️ This member is not on the trust team.");
+  }
+
+  antiNukeData.trusted[guildId] =
+    trusted.filter(id => id !== userId);
+
+  saveAntiNukeData();
+
+  const embed = new EmbedBuilder()
+    .setColor(0x8B0000)
+    .setTitle("ZOMB | TRUST SYSTEM")
+    .setDescription(
+      `**${trustedUser.username}** has been removed from the trust team.`
+    )
+    .setFooter({ text: "ZOMB ANTINUKE" })
+    .setTimestamp();
+
+  return message.reply({ embeds: [embed] });
+}
+
   if (action === "trustlist") {
     if (trusted.length === 0) {
       return message.reply("The ZOMB trusted team is currently empty.");
