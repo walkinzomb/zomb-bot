@@ -112,7 +112,7 @@ const ANTI_NUKE_LIMITS = {
   },
 
   memberKick: { max: 2, windowMs: 10000 },
-  memberBan: { max: 2, windowMs: 10000 },
+  memberBan: { max: 1, windowMs: 10000 },
   botAdd: { max: 1, windowMs: 10000 },
 
   webhookCreate: { max: 2, windowMs: 10000 },
