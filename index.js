@@ -119,7 +119,7 @@ const ANTI_NUKE_LIMITS = {
   webhookDelete: { max: 1, windowMs: 10000 },
   webhookUpdate: { max: 3, windowMs: 10000 },
 
-  guildUpdate: { max: 2, windowMs: 10000 }
+  guildUpdate: { max: 1, windowMs: 10000 }
 };
 
 const actionTracker = new Map();
