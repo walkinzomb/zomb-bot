@@ -49,6 +49,8 @@ let antiNukeData = {
 const actionTracker = new Map();
 async function checkAntiNuke(guild, targetId, actionType, actionName) {
   try {
+      // Only protect servers where anti-nuke is enabled
+  if (antiNukeData.enabled[guild.id] !== true) return;
     // Give Discord time to update its audit log
     await new Promise(resolve => setTimeout(resolve, 1000));
 
