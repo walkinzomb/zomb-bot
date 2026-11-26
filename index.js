@@ -558,32 +558,39 @@ client.on("guildMemberAdd", member => {
 // WEBHOOK PROTECTION
 // ==========================================
 
-client.on("webhooksUpdate", channel => {
+client.on("webhooksUpdate", async channel => {
   if (!channel.guild) return;
 
-  const webhookActions = [
-    {
-      type: AuditLogEvent.WebhookCreate,
-      name: "webhookCreate"
-    },
-    {
-      type: AuditLogEvent.WebhookDelete,
-      name: "webhookDelete"
-    },
-    {
-      type: AuditLogEvent.WebhookUpdate,
-      name: "webhookUpdate"
-    }
-  ];
+  try {
+    await new Promise(resolve => setTimeout(resolve, 1200));
 
-  for (const action of webhookActions) {
-    processAuditEntries(
-      channel.guild,
-      action.type,
-      action.name
-    );
+    const webhookActions = [
+      {
+        type: AuditLogEvent.WebhookCreate,
+        name: "webhookCreate"
+      },
+      {
+        type: AuditLogEvent.WebhookDelete,
+        name: "webhookDelete"
+      },
+      {
+        type: AuditLogEvent.WebhookUpdate,
+        name: "webhookUpdate"
+      }
+    ];
+
+    for (const action of webhookActions) {
+      await processAuditEntries(
+        channel.guild,
+        action.type,
+        action.name
+      );
+    }
+  } catch (error) {
+    console.error("[ZOMB WEBHOOK ERROR]", error);
   }
 });
+
 
 // ==========================================
 // SERVER SETTINGS PROTECTION
