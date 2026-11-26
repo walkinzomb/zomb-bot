@@ -99,39 +99,40 @@ client.on("messageCreate", async message => {
   const trusted = antiNukeData.trusted[guildId];
 
   
-  if (action === "trust") {
-    const userId =
-      message.mentions.users.first()?.id ||
-      args[2]?.match(/^\d{17,20}$/)?.[0];
+ 
+if (action === "trust") {
+  const userId =
+    message.mentions.users.first()?.id ||
+    args[2]?.match(/^\d{17,20}$/)?.[0];
 
-    if (!userId) {
-      return message.reply(
-        "Usage: `~an trust @user` or `~an trust USER_ID`"
-      );
-    }
-
-    if (userId === message.author.id) {
-      return message.reply("❌ You cannot trust yourself.");
-    }
-
-    let trustedUser = message.mentions.users.first();
-
-    if (trustedUser?.bot) {
-      return message.reply("❌ You cannot trust bots.");
-    }
-
-    if (trusted.includes(userId)) {
-      return message.reply("⚠️ This member is already trusted.");
-    }
-
-    trusted.push(userId);
-    saveAntiNukeData();
-
-    return message.reply(
-      `<@${userId}> you are now added to the trust team`
-    );
+  if (!userId) {
+    return message.reply("Usage: `~an trust @user` or `~an trust USER_ID`");
   }
 
+  const trustedUser = await client.users.fetch(userId).catch(() => null);
+
+  if (!trustedUser || trustedUser.bot || userId === message.author.id) {
+    return message.reply("❌ Invalid user. You cannot trust bots or yourself.");
+  }
+
+  if (trusted.includes(userId)) {
+    return message.reply("⚠️ This member is already trusted.");
+  }
+
+  trusted.push(userId);
+  saveAntiNukeData();
+
+  const embed = new EmbedBuilder()
+    .setColor(0x8B0000)
+    .setTitle("ZOMB | TRUST SYSTEM")
+    .setDescription(
+      `**${trustedUser.username}** you are now added to the trust team.`
+    )
+    .setFooter({ text: "ZOMB ANTINUKE" })
+    .setTimestamp();
+
+  return message.reply({ embeds: [embed] });
+}
 
 if (action === "untrust") {
   const userId =
@@ -139,9 +140,7 @@ if (action === "untrust") {
     args[2]?.match(/^\d{17,20}$/)?.[0];
 
   if (!userId) {
-    return message.reply(
-      "Usage: `~an untrust @user` or `~an untrust USER_ID`"
-    );
+    return message.reply("Usage: `~an untrust @user` or `~an untrust USER_ID`");
   }
 
   const trustedUser = await client.users.fetch(userId).catch(() => null);
@@ -171,45 +170,31 @@ if (action === "untrust") {
   return message.reply({ embeds: [embed] });
 }
 
-  if (action === "trustlist") {
-    if (trusted.length === 0) {
-      return message.reply("The ZOMB trusted team is currently empty.");
-    }
-
-    return message.reply(
-      "**ZOMB TRUSTED TEAM**\n" +
-      trusted.map(id => `• <@${id}>`).join("\n")
-    );
+if (action === "trustlist") {
+  if (trusted.length === 0) {
+    return message.reply("The ZOMB trusted team is currently empty.");
   }
 
-  re
-return message.reply({
-  embeds: [
-    new EmbedBuilder()
-      .setColor(0x8B0000)
-      .setTitle("ZOMB | TRUST SYSTEM")
-      .setDescription(
-        `**${trustedUser.username}** you are now added to the trust team.`
-      )
-      .setFooter({ text: "ZOMB ANTINUKE" })
-      .setTimestamp()
-  ]
-});
+  const members = await Promise.all(
+    trusted.map(id => client.users.fetch(id).catch(() => null))
+  );
 
+  const usernames = members
+    .filter(Boolean)
+    .map(user => `• ${user.username}`);
 
-client.on("interactionCreate", async interaction => {
-  if (!interaction.isChatInputCommand()) return;
+  const embed = new EmbedBuilder()
+    .setColor(0x8B0000)
+    .setTitle("ZOMB | TRUST TEAM")
+    .setDescription(usernames.join("\n") || "No available usernames found.")
+    .setFooter({
+      text: `ZOMB ANTINUKE • ${usernames.length} Trusted Members`
+    })
+    .setTimestamp();
 
-  if (interaction.commandName === "ping") {
-    await interaction.reply("ZOMB is online. ⚡");
-  }
+  return message.reply({ embeds: [embed] });
+}
 
-  if (interaction.commandName === "help") {
-    await interaction.reply(
-      "**ZOMB COMMANDS**\n\n/ping — Check bot status\n/help — View commands"
-    );
-  }
-});
 
 async function start() {
   await registerCommands();
