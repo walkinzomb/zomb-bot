@@ -34,7 +34,31 @@ const commands = [
     .setIntegrationTypes(0, 1)
     .setContexts(0, 1, 2)
 ].map(command => command.toJSON());
+let antiNukeData = {
+  trusted: {},
+  enabled: {}
+};
 
+function loadAntiNukeData() {
+  try {
+    if (fs.existsSync(DATA_FILE)) {
+      antiNukeData = JSON.parse(
+        fs.readFileSync(DATA_FILE, "utf8")
+      );
+    }
+  } catch (error) {
+    console.error("Anti-nuke data loading failed:", error);
+  }
+}
+
+function saveAntiNukeData() {
+  fs.writeFileSync(
+    DATA_FILE,
+    JSON.stringify(antiNukeData, null, 2)
+  );
+}
+
+loadAntiNukeData();
 const rest = new REST({ version: "10" })
   .setToken(process.env.DISCORD_TOKEN);
 
