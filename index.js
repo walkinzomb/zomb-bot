@@ -93,6 +93,27 @@ async function checkAntiNuke(guild, targetId, actionType, actionName) {
     console.error("[ZOMB ANTI-NUKE ERROR]", error);
   }
 }
+client.on("channelDelete", channel => {
+  if (!channel.guild) return;
+
+  checkAntiNuke(
+    channel.guild,
+    channel.id,
+    AuditLogEvent.ChannelDelete,
+    "channelDelete"
+  );
+});
+
+client.on("channelCreate", channel => {
+  if (!channel.guild) return;
+
+  checkAntiNuke(
+    channel.guild,
+    channel.id,
+    AuditLogEvent.ChannelCreate,
+    "channelCreate"
+  );
+});
 const ANTI_NUKE_LIMITS = {
   channelDelete: {
     max: 3,
