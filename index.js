@@ -108,6 +108,31 @@ async function checkAntiNuke(guild, targetId, actionType, actionName) {
   }
 }
 
+async function sendAntiNukeLog(guild, title, description) {
+  try {
+    const channelId = antiNukeData.logs?.[guild.id];
+
+    if (!channelId) return;
+
+    const logChannel = await guild.channels
+      .fetch(channelId)
+      .catch(() => null);
+
+    if (!logChannel || !logChannel.isTextBased()) return;
+
+    const embed = new EmbedBuilder()
+      .setColor(0x8B0000)
+      .setTitle(`ZOMB | ${title}`)
+      .setDescription(description)
+      .setFooter({ text: "ZOMB ANTINUKE SECURITY" })
+      .setTimestamp();
+
+    await logChannel.send({ embeds: [embed] });
+  } catch (error) {
+    console.error("[ZOMB LOG ERROR]", error);
+  }
+}
+
 client.on("channelDelete", channel => {
   if (!channel.guild) return;
 
