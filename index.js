@@ -966,6 +966,33 @@ client.on("messageCreate", async message => {
   }
 
   const action = (args[1] || "").toLowerCase();
+  
+if (action === "antibot") {
+  const setting = (args[2] || "").toLowerCase();
+
+  if (setting === "enable") {
+    antiNukeData.antiBot[guildId] = true;
+    saveAntiNukeData();
+
+    return message.reply(
+      "🛡️ ZOMB Anti-Bot ENABLED!"
+    );
+  }
+
+  if (setting === "disable") {
+    antiNukeData.antiBot[guildId] = false;
+    saveAntiNukeData();
+
+    return message.reply(
+      "⚠️ ZOMB Anti-Bot DISABLED!"
+    );
+  }
+
+  return message.reply(
+    "Usage: `~an antibot enable` or `~an antibot disable`"
+  );
+}
+
   const guildId = message.guild.id;
 
   if (!Array.isArray(antiNukeData.trusted[guildId])) {
