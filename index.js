@@ -337,8 +337,11 @@ const logs = await guild.fetchAuditLogs({
         entry.executor &&
         now - entry.createdTimestamp >= 0 &&
         now - entry.createdTimestamp <= AUDIT_LOOKBACK_MS &&
-        (!targetId || entry.target?.id === targetId)
-      )
+        (
+  !targetId ||
+  entry.target?.id === targetId ||
+  entry.extra?.channel?.id === targetId
+)
       .sort((a, b) =>
         a.createdTimestamp - b.createdTimestamp
       );
