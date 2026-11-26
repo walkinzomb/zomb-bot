@@ -784,6 +784,9 @@ client.on("messageCreate", async message => {
     checkAntiSpam(message).catch(error => {
     console.error("[ZOMB ANTISPAM ERROR]", error);
   });
+    checkAntiLink(message).catch(error => {
+    console.error("[ZOMB ANTILINK ERROR]", error);
+  });
   if (!message.guild || message.author.bot) return;
 
   const args = message.content.trim().split(/\s+/);
