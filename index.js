@@ -152,6 +152,7 @@ function addedDangerousPermission(oldRole, newRole) {
 // LOGGING
 // ==========================================
 
+
 async function sendAntiNukeLog(
   guild,
   title,
@@ -166,9 +167,13 @@ async function sendAntiNukeLog(
       .fetch(channelId)
       .catch(() => null);
 
-    if (!logChannel || !logChannel.isTextBased()) {
+    if (
+      !logChannel ||
+      !logChannel.isTextBased() ||
+      !logChannel.send
+    ) {
       console.error("[ZOMB] Log channel unavailable.");
-      return;
+      return false;
     }
 
     const embed = new EmbedBuilder()
@@ -184,10 +189,15 @@ async function sendAntiNukeLog(
       embeds: [embed]
     });
 
+    console.log("[ZOMB] Log message sent successfully.");
+    return true;
+
   } catch (error) {
     console.error("[ZOMB LOG ERROR]", error);
+    return false;
   }
 }
+
 
 // ==========================================
 // ATTACKER PROTECTION
