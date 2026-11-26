@@ -246,7 +246,7 @@ async function checkAntiNuke(
     console.error("[ZOMB ANTI-NUKE ERROR]", error);
   }
 }
-}
+
 
 // CHANNEL DELETION DETECTION
 client.on("channelDelete", channel => {
