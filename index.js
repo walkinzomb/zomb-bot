@@ -335,6 +335,9 @@ client.on("messageCreate", async message => {
     "`~an untrust @user` — Remove a trusted member\n" +
     "`~an untrust USER_ID` — Remove by ID\n" +
     "`~an trustlist` — View trusted members"
+    "`~an enable` — Enable protection\n" +
+"`~an disable` — Disable protection\n" +
+"`~an status` — Check protection status\n"
   );
 }); // Correctly closes messageCreate
 
