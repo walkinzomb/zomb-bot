@@ -131,7 +131,6 @@ async function sendAntiNukeLog(guild, title, description) {
   }
 }
 
-// ANTI-NUKE DETECTION
 async function checkAntiNuke(
   guild,
   targetId,
@@ -147,24 +146,31 @@ async function checkAntiNuke(
 
     const logs = await guild.fetchAuditLogs({
       type: actionType,
-      limit: 5
+      limit: 10
     });
 
     const entry = logs.entries.find(log =>
       log.target?.id === targetId &&
       log.executor &&
-      Date.now() - log.createdTimestamp < 15000
+      Date.now() - log.createdTimestamp < 15000 &&
+      !processedAuditEntries.has(log.id)
     );
 
     if (!entry) return;
 
+    processedAuditEntries.add(entry.id);
+
+    // Keep the processed-entry list limited
+    if (processedAuditEntries.size > 1000) {
+      const oldest = processedAuditEntries.values().next().value;
+      processedAuditEntries.delete(oldest);
+    }
+
     const executorId = entry.executor.id;
 
-    // Protect server owner and ZOMB itself
     if (executorId === guild.ownerId) return;
     if (executorId === client.user.id) return;
 
-    // TRUST TEAM EXEMPTION
     const trustedUsers =
       antiNukeData.trusted[guild.id] || [];
 
@@ -173,7 +179,6 @@ async function checkAntiNuke(
     const limit = ANTI_NUKE_LIMITS[actionName];
     if (!limit) return;
 
-    // TRACK ACTIONS
     const key = `${guild.id}:${executorId}:${actionName}`;
     const now = Date.now();
 
@@ -183,68 +188,45 @@ async function checkAntiNuke(
     timestamps.push(now);
     actionTracker.set(key, timestamps);
 
-    // Wait until threshold is reached
     if (timestamps.length < limit.max) return;
 
-    // Reset counter
     actionTracker.set(key, []);
 
     const reason =
       `ZOMB Anti-Nuke: Excessive ${actionName} activity`;
 
-    let roleResponse = "Role removal unsuccessful";
-    let banResponse = "Ban unsuccessful";
-
-    // FETCH ATTACKER
     const member = await guild.members.fetch(executorId)
       .catch(() => null);
 
-    // REMOVE MANAGEABLE ROLES
-    if (member) {
-      try {
-        const removableRoles = member.roles.cache
-          .filter(role =>
-            role.id !== guild.id && role.editable
-          )
-          .map(role => role.id);
+    if (!member || member.user.bot) return;
 
-        if (removableRoles.length > 0) {
-          await member.roles.remove(
-            removableRoles,
-            reason
-          );
-        }
+    let roleResponse = "No manageable roles removed";
+    let banResponse = "Ban not attempted";
 
+    try {
+      const removableRoles = member.roles.cache
+        .filter(role =>
+          role.id !== guild.id && role.editable
+        )
+        .map(role => role.id);
+
+      if (removableRoles.length > 0) {
+        await member.roles.remove(removableRoles, reason);
         roleResponse = "Manageable roles removed";
-
-      } catch (error) {
-        console.error(
-          "[ZOMB ROLE REMOVAL ERROR]",
-          error
-        );
-
-        roleResponse = "Role removal failed";
       }
+    } catch (error) {
+      console.error("[ZOMB ROLE REMOVAL ERROR]", error);
+      roleResponse = "Role removal failed";
     }
 
-    // PERMANENT BAN
     try {
-      await guild.members.ban(executorId, {
-        reason
-      });
-
+      await guild.members.ban(executorId, { reason });
       banResponse = "Permanent ban successful";
-
     } catch (error) {
-      console.error(
-        "[ZOMB BAN ERROR]",
-        error
-      );
-
+      console.error("[ZOMB BAN ERROR]", error);
       banResponse = "Ban failed - check permissions";
     }
 
-    // SECURITY ALERT
     await sendAntiNukeLog(
       guild,
       "ATTACK DETECTED",
@@ -261,11 +243,9 @@ async function checkAntiNuke(
     );
 
   } catch (error) {
-    console.error(
-      "[ZOMB ANTI-NUKE ERROR]",
-      error
-    );
+    console.error("[ZOMB ANTI-NUKE ERROR]", error);
   }
+}
 }
 
 // CHANNEL DELETION DETECTION
