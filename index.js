@@ -78,9 +78,11 @@ const actionTracker = new Map();
     timestamps.push(now);
     actionTracker.set(key, timestamps);
 
-    // Trigger only once when the threshold is reached
-    if (timestamps.length === limit.max) {
-      
+  
+if (timestamps.length < limit.max) return;
+
+actionTracker.set(key, []);
+
 const member = await guild.members.fetch(executorId)
   .catch(() => null);
 
@@ -100,18 +102,12 @@ if (member && !member.user.bot && member.bannable) {
 
     await member.ban({ reason });
 
-    response = "All manageable roles stripped and member permanently banned";
+    response = "Roles stripped and member permanently banned";
   } catch (error) {
     console.error("[ZOMB PUNISHMENT ERROR]", error);
-    response = "Punishment partially failed; check bot permissions and role hierarchy";
+    response = "Punishment failed or partially completed";
   }
 }
-
-
-      console.warn(
-        `[ZOMB ANTI-NUKE] ${entry.executor.tag} timed out in ${guild.name}`
-      );
-    }
 
 await sendAntiNukeLog(
   guild,
@@ -120,13 +116,9 @@ await sendAntiNukeLog(
   `**User ID:** ${executorId}\n` +
   `**Action:** ${actionName}\n` +
   `**Threshold:** ${limit.max} actions in 10 seconds\n` +
-  `**Response:** 10-minute timeout`
+  `**Response:** ${response}`
 );
 
-  } catch (error) {
-    console.error("[ZOMB ANTI-NUKE ERROR]", error);
-  }
-}
 
 async function sendAntiNukeLog(guild, title, description) {
   try {
