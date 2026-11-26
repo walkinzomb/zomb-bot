@@ -165,7 +165,7 @@ async function checkAntiSpam(message) {
 
   const guildId = message.guild.id;
   const userId = message.author.id;
-
+if (antiNukeData.enabled[guildId] !== true) return;
   if (userId === message.guild.ownerId) return;
 
   const trusted =
