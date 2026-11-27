@@ -2008,8 +2008,27 @@ for (const mentionedUser of message.mentions.users.values()) {
   const afkData = afkUsers[afkGuildId]?.[mentionedUser.id];
 
   if (afkData) {
-    message.channel.send(
-      `💤 **${mentionedUser.username} is AFK:** ${afkData.reason}`
+    const awayTime = Date.now() - afkData.since;
+
+    const seconds = Math.floor(awayTime / 1000);
+    const minutes = Math.floor(seconds / 60);
+    const hours = Math.floor(minutes / 60);
+    const days = Math.floor(hours / 24);
+
+    let duration;
+
+    if (days > 0) {
+      duration = `${days} day(s), ${hours % 24} hour(s)`;
+    } else if (hours > 0) {
+      duration = `${hours} hour(s), ${minutes % 60} minute(s)`;
+    } else if (minutes > 0) {
+      duration = `${minutes} minute(s)`;
+    } else {
+      duration = `${seconds} second(s)`;
+    }
+
+    message.reply(
+      `<@${mentionedUser.id}> is AFK: ${afkData.reason}\nThey have been AFK for ${duration}.`
     );
   }
 }
