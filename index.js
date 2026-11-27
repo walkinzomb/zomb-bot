@@ -61,7 +61,33 @@ function saveAliases() {
     JSON.stringify(aliases, null, 2)
   );
 }
+// ==========================================
+// ZOMB AFK STORAGE
+// ==========================================
 
+const AFK_FILE = process.env.AFK_FILE ||
+  path.join("/data", "afk.json");
+
+function loadAfk() {
+  try {
+    return JSON.parse(fs.readFileSync(AFK_FILE, "utf8"));
+  } catch {
+    return {};
+  }
+}
+
+let afkUsers = loadAfk();
+
+function saveAfk() {
+  fs.mkdirSync(path.dirname(AFK_FILE), {
+    recursive: true
+  });
+
+  fs.writeFileSync(
+    AFK_FILE,
+    JSON.stringify(afkUsers, null, 2)
+  );
+}
 const LOG_CHANNEL_ID = "1575507474709090446";
 const AUDIT_LOOKBACK_MS = 15000;
 
