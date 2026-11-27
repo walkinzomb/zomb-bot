@@ -1146,11 +1146,14 @@ client.on("messageCreate", async message => {
     const guildId = message.guild.id;
     const trusted = antiNukeData.trusted[guildId] || [];
 
-    if (!trusted.includes(message.author.id)) {
-      return message.reply(
-        "❌ Only members on the ZOMB trustlist can use the vouch system."
-      );
-    }
+    if (
+  message.author.id !== message.guild.ownerId &&
+  !trusted.includes(message.author.id)
+) {
+  return message.reply(
+    "❌ Only trusted members can view their vouch usage."
+  );
+}
 
     const targetUser = message.mentions.users.first();
     const type = (args[2] || "").toLowerCase();
@@ -1288,11 +1291,14 @@ client.on("messageCreate", async message => {
     const guildId = message.guild.id;
     const trusted = antiNukeData.trusted[guildId] || [];
 
-    if (!trusted.includes(message.author.id)) {
-      return message.reply(
-        "❌ Only trusted members can view their vouch usage."
-      );
-    }
+   if (
+  message.author.id !== message.guild.ownerId &&
+  !trusted.includes(message.author.id)
+) {
+  return message.reply(
+    "❌ Only trusted members can view their vouch usage."
+  );
+}
 
     const voucherData =
       antiNukeData.vouches?.[guildId]?.[message.author.id] || {
