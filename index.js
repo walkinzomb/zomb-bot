@@ -800,7 +800,7 @@ client.on("guildMemberAdd", member => {
     member.id
   );
 });
-}
+
 
 
 // ==========================================
