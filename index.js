@@ -1947,11 +1947,23 @@ if (
 
     await message.guild.roles.fetch();
 
-    const role = message.guild.roles.cache.find(
-      r =>
-        r.id === roleInput ||
-        r.name.toLowerCase() === roleInput.toLowerCase()
-    );
+    const matches = message.guild.roles.cache.filter(
+  r =>
+    r.id === roleInput ||
+    r.name.toLowerCase().includes(roleInput.toLowerCase())
+);
+
+if (matches.size === 0) {
+  return message.reply("I couldn't find that role in this server.");
+}
+
+if (matches.size > 1) {
+  return message.reply(
+    `Multiple roles match "${roleInput}". Be more specific: ${matches.map(r => r.name).join(", ")}`
+  );
+}
+
+const role = matches.first();
 
     if (!role) {
       return message.reply("I couldn't find that role in this server.");
