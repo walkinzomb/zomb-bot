@@ -1854,113 +1854,7 @@ return interaction.update({
   }
 });
 
-// ==========================================
-// ZOMB ROLE COMMANDS
-// ==========================================
 
-if (
-  command === "~r" ||
-  command === "~role" ||
-  command === "~ir" ||
-  command === "~roleinfo"
-) {
-  if (!message.member.permissions.has(PermissionsBitField.Flags.ManageRoles)) {
-    return message.reply("You need Manage Roles permission to use this command.");
-  }
-
-  // ROLE INFO COMMANDS
-  if (command === "~ir" || command === "~roleinfo") {
-    const roleId =
-      message.mentions.roles.first()?.id ||
-      args.find(arg => /^\d{17,20}$/.test(arg));
-
-    if (!roleId) {
-      return message.reply("Usage: `~ir @role` or `~ir ROLE_ID`");
-    }
-
-    const role = await message.guild.roles.fetch(roleId).catch(() => null);
-
-    if (!role) {
-      return message.reply("I couldn't find that role in this server.");
-    }
-
-    const embed = new EmbedBuilder()
-      .setColor(role.color || 0x2b2d31)
-      .setTitle("ROLE INFORMATION")
-      .addFields(
-        { name: "Role", value: `${role}`, inline: true },
-        { name: "Role ID", value: `\`${role.id}\``, inline: true },
-        { name: "Members", value: `${role.members.size}`, inline: true },
-        { name: "Color", value: role.hexColor, inline: true },
-        { name: "Position", value: `${role.position}`, inline: true },
-        { name: "Mentionable", value: role.mentionable ? "Yes" : "No", inline: true },
-        { name: "Hoisted", value: role.hoist ? "Yes" : "No", inline: true },
-        { name: "Managed", value: role.managed ? "Yes" : "No", inline: true }
-      );
-
-    return message.reply({ embeds: [embed] });
-  }
-
-  // ROLE TOGGLE COMMANDS
-  const targetUser =
-    message.mentions.users.first() ||
-    message.guild.members.cache.get(args[1])?.user;
-
-  const roleId =
-    message.mentions.roles.first()?.id ||
-    args.find((arg, index) => index >= 1 && /^\d{17,20}$/.test(arg));
-
-  if (!targetUser || !roleId) {
-    return message.reply(
-      "Usage: `~r @user @role` or `~r USER_ID ROLE_ID`"
-    );
-  }
-
-  const targetMember = await message.guild.members
-    .fetch(targetUser.id)
-    .catch(() => null);
-
-  if (!targetMember) {
-    return message.reply("I couldn't find that member in this server.");
-  }
-
-  const role = await message.guild.roles.fetch(roleId).catch(() => null);
-
-  if (!role) {
-    return message.reply("I couldn't find that role in this server.");
-  }
-
-  if (role.id === message.guild.id || role.managed) {
-    return message.reply("That role cannot be manually assigned or removed.");
-  }
-
-  if (role.position >= message.guild.members.me.roles.highest.position) {
-    return message.reply("That role is above or equal to ZOMB's highest role.");
-  }
-
-  if (targetMember.id !== message.guild.ownerId &&
-      targetMember.roles.highest.position >= message.member.roles.highest.position) {
-    return message.reply("You cannot change roles for a member with an equal or higher role than yours.");
-  }
-
-  if (targetMember.roles.cache.has(role.id)) {
-    await targetMember.roles.remove(role).catch(() => null);
-
-    if (targetMember.roles.cache.has(role.id)) {
-      return message.reply("ZOMB couldn't remove that role. Check its permissions and role hierarchy.");
-    }
-
-    return message.reply(`${role} has been removed from ${targetMember}.`);
-  }
-
-  await targetMember.roles.add(role).catch(() => null);
-
-  if (!targetMember.roles.cache.has(role.id)) {
-    return message.reply("ZOMB couldn't assign that role. Check its permissions and role hierarchy.");
-  }
-
-  return message.reply(`${role} has been added to ${targetMember}.`);
-}
 
 // ==========================================
 // ZOMB SNIPE SYSTEM
@@ -2030,6 +1924,110 @@ client.on("messageCreate", async message => {
   const args = message.content.trim().split(/\s+/);
   const command = args[0].toLowerCase();
   
+// ==========================================
+// ZOMB ROLE COMMANDS
+// ==========================================
+
+if (
+  command === "~r" ||
+  command === "~role" ||
+  command === "~ir" ||
+  command === "~roleinfo"
+) {
+  if (!message.member.permissions.has(PermissionsBitField.Flags.ManageRoles)) {
+    return message.reply("You need Manage Roles permission to use this command.");
+  }
+
+  // ROLE INFO COMMANDS
+  if (command === "~ir" || command === "~roleinfo") {
+    const roleId =
+      message.mentions.roles.first()?.id ||
+      args.find(arg => /^\d{17,20}$/.test(arg));
+
+    if (!roleId) {
+      return message.reply("Usage: `~ir @role` or `~ir ROLE_ID`");
+    }
+
+    const role = await message.guild.roles.fetch(roleId).catch(() => null);
+
+    if (!role) {
+      return message.reply("I couldn't find that role in this server.");
+    }
+
+    const embed = new EmbedBuilder()
+      .setColor(role.color || 0x2b2d31)
+      .setTitle("ROLE INFORMATION")
+      .addFields(
+        { name: "Role", value: `${role}`, inline: true },
+        { name: "Role ID", value: `\`${role.id}\``, inline: true },
+        { name: "Members", value: `${role.members.size}`, inline: true },
+        { name: "Color", value: role.hexColor, inline: true },
+        { name: "Position", value: `${role.position}`, inline: true },
+        { name: "Mentionable", value: role.mentionable ? "Yes" : "No", inline: true },
+        { name: "Hoisted", value: role.hoist ? "Yes" : "No", inline: true },
+        { name: "Managed", value: role.managed ? "Yes" : "No", inline: true }
+      );
+
+    return message.reply({ embeds: [embed] });
+  }
+
+  // ROLE TOGGLE COMMANDS
+  const targetId =
+    message.mentions.users.first()?.id ||
+    args[1]?.replace(/[<@!>]/g, "");
+
+  const roleId =
+    message.mentions.roles.first()?.id ||
+    (args[2] && /^\d{17,20}$/.test(args[2]) ? args[2] : null);
+
+  if (!targetId || !roleId || !/^\d{17,20}$/.test(targetId)) {
+    return message.reply(
+      "Usage: `~r @user @role` or `~r USER_ID ROLE_ID`"
+    );
+  }
+
+  const targetMember = await message.guild.members
+    .fetch(targetId)
+    .catch(() => null);
+
+  if (!targetMember) {
+    return message.reply("I couldn't find that member in this server.");
+  }
+
+  const role = await message.guild.roles.fetch(roleId).catch(() => null);
+
+  if (!role) {
+    return message.reply("I couldn't find that role in this server.");
+  }
+
+  if (role.id === message.guild.id || role.managed) {
+    return message.reply("That role cannot be manually assigned or removed.");
+  }
+
+  const botMember = await message.guild.members.fetchMe();
+
+  if (role.position >= botMember.roles.highest.position) {
+    return message.reply("That role is above or equal to ZOMB's highest role.");
+  }
+
+  if (
+    targetMember.id !== message.guild.ownerId &&
+    targetMember.roles.highest.position >= message.member.roles.highest.position
+  ) {
+    return message.reply("You cannot change roles for a member with an equal or higher role than yours.");
+  }
+
+  if (targetMember.roles.cache.has(role.id)) {
+    await targetMember.roles.remove(role);
+
+    return message.reply(`${role} has been removed from ${targetMember}.`);
+  }
+
+  await targetMember.roles.add(role);
+
+  return message.reply(`${role} has been added to ${targetMember}.`);
+}
+
 // ==========================================
 // ZOMB SNIPE COMMANDS
 // ==========================================
