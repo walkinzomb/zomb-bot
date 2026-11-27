@@ -2154,28 +2154,30 @@ if (command === "~alias") {
   );
 }
 
+
 // ==========================================
 // ALIAS EXECUTION
 // ==========================================
 
-const aliasName = command.replace(/^~/, "");
-const aliasTemplate = aliases[message.guild.id]?.[aliasName];
+if (message.guild) {
+  const aliasName = command.replace(/^~/, "").toLowerCase();
+  const aliasTemplate = aliases[message.guild.id]?.[aliasName];
 
-if (aliasTemplate) {
-  const originalArguments = args.slice(1);
+  if (aliasTemplate) {
+    const originalArguments = args.slice(1);
 
-  const expandedCommand = aliasTemplate.replace(
-    /\{(\d+)\}/g,
-    (_, index) => originalArguments[Number(index)] || ""
-  );
+    const expandedCommand = aliasTemplate.replace(
+      /\{(\d+)\}/g,
+      (_, index) => originalArguments[Number(index)] || ""
+    );
 
-  const cleanCommand = expandedCommand.trim();
+    const expandedParts = expandedCommand.trim().split(/\s+/);
 
-  if (!cleanCommand) return;
-
-  args = [`~${cleanCommand}`].join(" ").split(/\s+/);
-  command = args[0].toLowerCase();
+    command = ("~" + expandedParts[0]).toLowerCase();
+    args = [command, ...expandedParts.slice(1)];
+  }
 }
+
 
   
 
