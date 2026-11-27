@@ -1941,61 +1941,38 @@ if (
 
   // ROLE INFO
   if (command === "~ir" || command === "~roleinfo") {
-    const roleInput =
-      message.mentions.roles.first()?.id ||
-      args.slice(1).join(" ").trim();
+  const roleInput =
+    message.mentions.roles.first()?.id ||
+    args.slice(1).join(" ").trim();
 
   await message.guild.roles.fetch();
-const roleSearch = roleInput
-  .toLowerCase()
-  .replace(/[‘’]/g, "'")
-  .trim();
 
-const matches = message.guild.roles.cache.filter(r => {
-  const name = r.name
-    .toLowerCase()
-    .replace(/[‘’]/g, "'")
-    .trim();
-
-  return (
-    r.id === roleInput ||
-    name.includes(roleSearch) ||
-    roleSearch.includes(name)
+  const role = message.guild.roles.cache.find(
+    r =>
+      r.id === roleInput ||
+      r.name.toLowerCase() === roleInput.toLowerCase()
   );
-});
 
-if (matches.size === 0) {
-  return message.reply("I couldn't find that role in this server.");
-}
-
-if (matches.size > 1) {
-  return message.reply(
-    `Multiple roles match "${roleInput}". Be more specific: ${matches.map(r => r.name).join(", ")}`
-  );
-}
-
-const role = matches.first();
-
-    if (!role) {
-      return message.reply("I couldn't find that role in this server.");
-    }
-
-    const embed = new EmbedBuilder()
-      .setColor(role.color || 0x2b2d31)
-      .setTitle("ROLE INFORMATION")
-      .addFields(
-        { name: "Role", value: `${role}`, inline: true },
-        { name: "Role ID", value: `\`${role.id}\``, inline: true },
-        { name: "Members", value: `${role.members.size}`, inline: true },
-        { name: "Color", value: role.hexColor, inline: true },
-        { name: "Position", value: `${role.position}`, inline: true },
-        { name: "Mentionable", value: role.mentionable ? "Yes" : "No", inline: true },
-        { name: "Hoisted", value: role.hoist ? "Yes" : "No", inline: true },
-        { name: "Managed", value: role.managed ? "Yes" : "No", inline: true }
-      );
-
-    return message.reply({ embeds: [embed] });
+  if (!role) {
+    return message.reply("I couldn't find that role in this server.");
   }
+
+  const embed = new EmbedBuilder()
+    .setColor(role.color || 0x2b2d31)
+    .setTitle("ROLE INFORMATION")
+    .addFields(
+      { name: "Role", value: `${role}`, inline: true },
+      { name: "Role ID", value: `\`${role.id}\``, inline: true },
+      { name: "Members", value: `${role.members.size}`, inline: true },
+      { name: "Color", value: role.hexColor, inline: true },
+      { name: "Position", value: `${role.position}`, inline: true },
+      { name: "Mentionable", value: role.mentionable ? "Yes" : "No", inline: true },
+      { name: "Hoisted", value: role.hoist ? "Yes" : "No", inline: true },
+      { name: "Managed", value: role.managed ? "Yes" : "No", inline: true }
+    );
+
+  return message.reply({ embeds: [embed] });
+}
 
   // ROLE TOGGLE
   const targetId =
