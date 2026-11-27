@@ -791,23 +791,7 @@ client.on("guildMemberAdd", member => {
   checkAntiRaid(member).catch(error => {
     console.error("[ZOMB ANTI-RAID ERROR]", error);
   });
-
-  if (!member.user.bot) return;
-
-  checkAntiBot(member).catch(error => {
-    console.error("[ZOMB ANTI-BOT ERROR]", error);
-  });
-
-  processAuditEntries(
-    member.guild,
-    AuditLogEvent.BotAdd,
-    "botAdd",
-    member.id
-  );
-});
-
-
-  if (!member.user.bot) return;
+    if (!member.user.bot) return;
 
   processAuditEntries(
     member.guild,
@@ -817,6 +801,8 @@ client.on("guildMemberAdd", member => {
   );
 });
 }
+
+
 // ==========================================
 // WEBHOOK PROTECTION
 // ==========================================
