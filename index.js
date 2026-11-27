@@ -1954,6 +1954,7 @@ if (command === "~help") {
         "**FUN**\n" +
         "`~tictactoe @user` — Challenge someone to Tic-Tac-Toe\n" +
         "`~ttt @user` — Shortcut for Tic-Tac-Toe\n\n" +
+        "`~snipe [number]` — View recently deleted messages\n" +
         "**VOUCH SYSTEM**\n" +
         "`~vouch @member` — Start a Staff or Admin vouch\n" +
         "`~vouchlist` — View your vouch usage\n" +
@@ -1968,6 +1969,7 @@ if (command === "~help") {
         "`~an enable/disable` — Configure detection\n" +
         "`~an antibot enable/disable` — Configure Anti-Bot\n" +
         "`~an punishment enable/disable` — Configure punishment",
+        
         0x5865F2
       )
     ]
