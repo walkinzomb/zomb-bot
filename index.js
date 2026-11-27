@@ -20,7 +20,17 @@ const {
 // ==========================================
 // ZOMB CONFIGURATION
 // ==========================================
-
+const VOUCH_ROLE_IDS = {
+  admin: [
+    "1572797324210602035",
+    "1573204007646793738"
+  ],
+  staff: [
+    "1570875395505389691",
+    "1570875403210330124",
+    "1570875406276624464"
+  ]
+};
 const DATA_FILE = process.env.ANTINUKE_FILE ||
   path.join("/data", "antinuke.json");
 
@@ -1259,15 +1269,32 @@ if (
         });
       }
 
-      const roleMenu = new RoleSelectMenuBuilder()
-        .setCustomId(
-          `zomb_vouch_role|${guildId}|${voucherId}|${targetId}|${type}`
-        )
-        .setPlaceholder(`Choose the ${type} role to assign`)
-        .setMinValues(1)
-        .setMaxValues(1);
+     const allowedRoleOptions = VOUCH_ROLE_IDS[type]
+  .map(roleId => interaction.guild.roles.cache.get(roleId))
+  .filter(role => role && !role.managed)
+  .map(role => ({
+    label: role.name.slice(0, 100),
+    value: role.id
+  }));
 
-      return interaction.update({
+if (allowedRoleOptions.length === 0) {
+  return interaction.update({
+    content: "No approved roles were found. Check your role IDs.",
+    embeds: [],
+    components: []
+  });
+}
+
+const roleMenu = new StringSelectMenuBuilder()
+  .setCustomId(
+    `zomb_vouch_role|${guildId}|${voucherId}|${targetId}|${type}`
+  )
+  .setPlaceholder(`Choose the ${type} role to assign`)
+  .setMinValues(1)
+  .setMaxValues(1)
+  .addOptions(allowedRoleOptions);
+
+return interaction.update({
   embeds: [
     zombEmbed(
       `${type.toUpperCase()} VOUCH`,
@@ -1280,14 +1307,12 @@ if (
     new ActionRowBuilder().addComponents(roleMenu)
   ]
 });
-    }
-
     // ==========================================
     // VOUCH ROLE PICKER
     // ==========================================
 
     if (
-      interaction.isRoleSelectMenu() &&
+      interaction.isStringSelectMenu() &&
       interaction.customId.startsWith("zomb_vouch_role|")
     ) {
       const parts = interaction.customId.split("|");
@@ -1321,6 +1346,12 @@ if (
 
       const guild = interaction.guild;
       const selectedRoleId = interaction.values[0];
+      if (!VOUCH_ROLE_IDS[type].includes(selectedRoleId)) {
+  return interaction.editReply({
+    content: "That role is not an approved ZOMB vouch role.",
+    components: []
+  });
+}
 
       const [voucherMember, targetMember, botMember, role] =
         await Promise.all([
