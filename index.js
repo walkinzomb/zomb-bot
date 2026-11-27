@@ -17,8 +17,9 @@ const {
 // ZOMB CONFIGURATION
 // ==========================================
 
+
 const DATA_FILE = process.env.ANTINUKE_FILE ||
-  path.join(__dirname, "antinuke.json");
+  path.join("/data", "antinuke.json");
 
 const LOG_CHANNEL_ID = "1575507474709090446";
 const AUDIT_LOOKBACK_MS = 15000;
