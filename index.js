@@ -60,25 +60,44 @@ let antiNukeData = {
   antiBot: {}
 };
 
+
 function loadAntiNukeData() {
   try {
-    if (fs.existsSync(DATA_FILE)) {
-      const saved = JSON.parse(
-        fs.readFileSync(DATA_FILE, "utf8")
-      );
+    const legacyFile = path.join(__dirname, "antinuke.json");
 
+    let saved;
+
+    if (fs.existsSync(DATA_FILE)) {
+      saved = JSON.parse(fs.readFileSync(DATA_FILE, "utf8"));
+    } else if (fs.existsSync(legacyFile)) {
+      saved = JSON.parse(fs.readFileSync(legacyFile, "utf8"));
+    }
+
+    if (saved) {
       antiNukeData = {
         trusted: saved.trusted || {},
         enabled: saved.enabled || {},
         logs: saved.logs || {},
-       punishment: saved.punishment || {},
-antiBot: saved.antiBot || {}
+        punishment: saved.punishment || {},
+        antiBot: saved.antiBot || {}
       };
+
+      fs.mkdirSync(path.dirname(DATA_FILE), {
+        recursive: true
+      });
+
+      fs.writeFileSync(
+        DATA_FILE,
+        JSON.stringify(antiNukeData, null, 2)
+      );
+
+      console.log("[ZOMB] Anti-Nuke data loaded and saved to persistent storage.");
     }
   } catch (error) {
     console.error("[ZOMB DATA ERROR]", error);
   }
 }
+
 
 function saveAntiNukeData() {
   try {
