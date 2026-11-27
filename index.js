@@ -1978,7 +1978,72 @@ client.on("messageCreate", async message => {
   
 let args = message.content.trim().split(/\s+/);
 let command = args[0].toLowerCase();
+// ==========================================
+// ZOMB AFK SYSTEM
+// ==========================================
 
+const guildId = message.guild.id;
+const userId = message.author.id;
+
+// SET AFK
+if (command === "~afk") {
+  const reason = args.slice(1).join(" ") || "AFK";
+
+  afkUsers[guildId] ||= {};
+
+  afkUsers[guildId][userId] = {
+    reason,
+    since: Date.now()
+  };
+
+  saveAfk();
+
+  return message.reply(
+    `💤 **You are now AFK:** ${reason}`
+  );
+}
+
+// CHECK MENTIONED AFK USERS
+for (const mentionedUser of message.mentions.users.values()) {
+  const afkData = afkUsers[guildId]?.[mentionedUser.id];
+
+  if (afkData) {
+    message.channel.send(
+      `💤 **${mentionedUser.username} is AFK:** ${afkData.reason}`
+    );
+  }
+}
+
+// AUTOMATICALLY REMOVE AFK WHEN USER RETURNS
+const returningAfk = afkUsers[guildId]?.[userId];
+
+if (returningAfk) {
+  const awayTime = Date.now() - returningAfk.since;
+
+  const seconds = Math.floor(awayTime / 1000);
+  const minutes = Math.floor(seconds / 60);
+  const hours = Math.floor(minutes / 60);
+  const days = Math.floor(hours / 24);
+
+  let duration;
+
+  if (days > 0) {
+    duration = `${days} day(s), ${hours % 24} hour(s)`;
+  } else if (hours > 0) {
+    duration = `${hours} hour(s), ${minutes % 60} minute(s)`;
+  } else if (minutes > 0) {
+    duration = `${minutes} minute(s)`;
+  } else {
+    duration = `${seconds} second(s)`;
+  }
+
+  delete afkUsers[guildId][userId];
+  saveAfk();
+
+  message.reply(
+    `👋 **Welcome back, ${message.author.username}!** You were away for **${duration}**.`
+  );
+}
 // ==========================================
 // ZOMB ALIAS SYSTEM
 // ==========================================
