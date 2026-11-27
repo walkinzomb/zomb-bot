@@ -1949,11 +1949,23 @@ if (
 
 const search = roleInput.toLowerCase();
 
-const matches = message.guild.roles.cache.filter(r =>
-  r.id === roleInput ||
-  r.name.toLowerCase().includes(search) ||
-  search.includes(r.name.toLowerCase())
-);
+cconst search = roleInput
+  .toLowerCase()
+  .replace(/[‘’]/g, "'")
+  .trim();
+
+const matches = message.guild.roles.cache.filter(r => {
+  const name = r.name
+    .toLowerCase()
+    .replace(/[‘’]/g, "'")
+    .trim();
+
+  return (
+    r.id === roleInput ||
+    name.includes(search) ||
+    search.includes(name)
+  );
+});
 
 if (matches.size === 0) {
   return message.reply("I couldn't find that role in this server.");
