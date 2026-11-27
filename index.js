@@ -63,7 +63,6 @@ let antiNukeData = {
 function loadAntiNukeData() {
   try {
     const legacyFile = path.join(__dirname, "antinuke.json");
-
     let saved;
 
     if (fs.existsSync(DATA_FILE)) {
@@ -93,7 +92,6 @@ function loadAntiNukeData() {
     );
 
     console.log("[ZOMB] Data loaded from persistent storage.");
-
   } catch (error) {
     console.error("[ZOMB DATA ERROR]", error);
   }
@@ -136,55 +134,6 @@ const STAFF_EXTRA_PERMISSIONS = [
   PermissionsBitField.Flags.ManageNicknames,
   PermissionsBitField.Flags.ViewAuditLog
 ];
-
-function findVouchRole(guild, voucherMember, type) {
-  const botMember = guild.members.me;
-
-  if (!botMember) return null;
-
-  const eligibleRoles = guild.roles.cache
-    .filter(role => {
-      if (role.id === guild.id) return false;
-
-      if (role.position >= voucherMember.roles.highest.position) {
-        return false;
-      }
-
-      if (role.position >= botMember.roles.highest.position) {
-        return false;
-      }
-
-      if (!role.editable) return false;
-
-      const isAdmin = role.permissions.has(
-        PermissionsBitField.Flags.Administrator
-      );
-
-      if (type === "admin") {
-        return isAdmin;
-      }
-
-      if (type === "staff") {
-        if (isAdmin) return false;
-
-        const hasManageRoles = role.permissions.has(
-          PermissionsBitField.Flags.ManageRoles
-        );
-
-        const hasExtraStaffPermission =
-          STAFF_EXTRA_PERMISSIONS.some(permission =>
-            role.permissions.has(permission)
-          );
-
-        return hasManageRoles && hasExtraStaffPermission;
-      }
-
-      return false;
-    })
-    .sort((a, b) => b.position - a.position);
-
-  return eligibleRoles.first() || null;
-}
 
 // ==========================================
 // ANTI-NUKE THRESHOLDS
@@ -299,9 +248,7 @@ async function sendAntiNukeLog(guild, title, description) {
       .setTimestamp();
 
     await logChannel.send({ embeds: [embed] });
-
     return true;
-
   } catch (error) {
     console.error("[ZOMB LOG ERROR]", error);
     return false;
@@ -322,7 +269,7 @@ async function checkAntiSpam(message) {
   if (userId === message.guild.ownerId) return;
 
   const trustedList = antiNukeData.trusted[guildId] || [];
-  if (trusted.includes(userId)) return;
+  if (trustedList.includes(userId)) return;
 
   const key = `${guildId}:${userId}`;
   const now = Date.now();
@@ -372,8 +319,8 @@ async function checkAntiLink(message) {
   if (inviteRegex.test(message.content)) return;
 
   const linkRegex = /https?:\/\/\S+|www\.\S+/gi;
-
   const links = message.content.match(linkRegex);
+
   if (!links) return;
 
   const key = `${guildId}:${userId}`;
@@ -471,7 +418,6 @@ async function checkAntiRaid(member) {
   if (timestamps.length < RAID_LIMIT) return;
 
   const lastAlert = raidAlertCooldown.get(guildId) || 0;
-
   if (now - lastAlert < RAID_COOLDOWN_MS) return;
 
   raidAlertCooldown.set(guildId, now);
@@ -511,7 +457,6 @@ async function punishAttacker(
       `**Threshold:** ${threshold}\n\n` +
       "Automatic punishment is currently disabled."
     );
-
     return;
   }
 
@@ -540,7 +485,6 @@ async function punishAttacker(
       `**Action:** ${actionName}\n` +
       "ZOMB cannot punish this member because of role hierarchy or permissions."
     );
-
     return;
   }
 
@@ -668,7 +612,6 @@ async function processAuditEntries(
       processedAuditEntries.clear();
       actionTracker.clear();
     }
-
   } catch (error) {
     console.error(`[ZOMB AUDIT ERROR] ${actionName}`, error);
   }
@@ -863,7 +806,6 @@ async function checkAntiBot(member) {
       `**Added by:** ${entry.executor.username}\n` +
       `**Action:** ${kickStatus}`
     );
-
   } catch (error) {
     console.error("[ZOMB ANTI-BOT ERROR]", error);
   }
@@ -997,8 +939,8 @@ client.on("interactionCreate", async interaction => {
       content:
         "**ZOMB COMMANDS**\n\n" +
         "`~nuke` — Restart the current channel\n" +
-        "`~vouch @member staff` — Vouch for Staff\n" +
-        "`~vouch @member admin` — Vouch for Admin\n" +
+        "`~vouch @member staff @StaffRole` — Vouch for Staff\n" +
+        "`~vouch @member admin @AdminRole` — Vouch for Admin\n" +
         "`~vouchlist` — View your vouch usage\n" +
         "`~an` — Anti-Nuke help\n" +
         "`~an status` — Protection status\n" +
@@ -1078,7 +1020,6 @@ client.on("messageCreate", async message => {
     }
 
     const oldChannel = message.channel;
-
     let prompt;
 
     try {
@@ -1102,7 +1043,6 @@ client.on("messageCreate", async message => {
         await prompt.edit(
           "⏰ **NUKE CANCELLED**\nYou did not confirm within 5 seconds."
         );
-
         return;
       }
 
@@ -1125,7 +1065,6 @@ client.on("messageCreate", async message => {
       }
 
       await newChannel.send("first");
-
     } catch (error) {
       console.error("[ZOMB NUKE ERROR]", error);
 
@@ -1147,23 +1086,24 @@ client.on("messageCreate", async message => {
     const trusted = antiNukeData.trusted[guildId] || [];
 
     if (
-  message.author.id !== message.guild.ownerId &&
-  !trusted.includes(message.author.id)
-) {
-  return message.reply(
-    "❌ Only trusted members can view their vouch usage."
-  );
-}
+      message.author.id !== message.guild.ownerId &&
+      !trusted.includes(message.author.id)
+    ) {
+      return message.reply(
+        "❌ Only trusted members can use the vouch system."
+      );
+    }
 
     const targetUser = message.mentions.users.first();
     const type = (args[2] || "").toLowerCase();
 
     if (!targetUser || !["staff", "admin"].includes(type)) {
       return message.reply(
-  "**VOUCH USAGE**\n" +
-  "`~vouch @member staff @StaffRole`\n" +
-  "`~vouch @member admin @AdminRole`"
-);
+        "**VOUCH USAGE**\n" +
+        "`~vouch @member staff @StaffRole`\n" +
+        "`~vouch @member admin @AdminRole`"
+      );
+    }
 
     if (
       targetUser.bot ||
@@ -1232,52 +1172,47 @@ client.on("messageCreate", async message => {
       );
     }
 
-   const role = message.mentions.roles.first();
-
-if (!role) {
-  return message.reply(
-    "❌ You must mention the Staff or Admin role you want to assign."
-  );
-}
-
-const isAdminRole = role.permissions.has(
-  PermissionsBitField.Flags.Administrator
-);
-
-const isStaffRole =
-  !isAdminRole &&
-  role.permissions.has(PermissionsBitField.Flags.ManageRoles) &&
-  STAFF_EXTRA_PERMISSIONS.some(permission =>
-    role.permissions.has(permission)
-  );
-
-if (type === "admin" && !isAdminRole) {
-  return message.reply(
-    "❌ That role does not have Administrator permission."
-  );
-}
-
-if (type === "staff" && !isStaffRole) {
-  return message.reply(
-    "❌ That role does not qualify as Staff."
-  );
-}
-
-if (
-  role.position >= voucherMember.roles.highest.position ||
-  role.position >= message.guild.members.me.roles.highest.position ||
-  !role.editable
-) {
-  return message.reply(
-    "❌ That role is too high for you or ZOMB to assign."
-  );
-}
+    const role = message.mentions.roles.first();
 
     if (!role) {
       return message.reply(
-        type === "admin"
-          ? "❌ ZOMB could not find an assignable Administrator role below both your highest role and ZOMB's highest role."
-          : "❌ ZOMB could not find an assignable Staff role with Manage Roles and additional staff permissions below both your highest role and ZOMB's highest role."
+        "❌ You must mention the Staff or Admin role you want to assign."
+      );
+    }
+
+    const isAdminRole = role.permissions.has(
+      PermissionsBitField.Flags.Administrator
+    );
+
+    const isStaffRole =
+      !isAdminRole &&
+      role.permissions.has(PermissionsBitField.Flags.ManageRoles) &&
+      STAFF_EXTRA_PERMISSIONS.some(permission =>
+        role.permissions.has(permission)
+      );
+
+    if (type === "admin" && !isAdminRole) {
+      return message.reply(
+        "❌ That role does not have Administrator permission."
+      );
+    }
+
+    if (type === "staff" && !isStaffRole) {
+      return message.reply(
+        "❌ That role does not qualify as Staff."
+      );
+    }
+
+    const botMember = message.guild.members.me;
+
+    if (
+      !botMember ||
+      role.position >= voucherMember.roles.highest.position ||
+      role.position >= botMember.roles.highest.position ||
+      !role.editable
+    ) {
+      return message.reply(
+        "❌ That role is too high for you or ZOMB to assign."
       );
     }
 
@@ -1307,7 +1242,6 @@ if (
         `**Vouches used:** ${voucherData[type].length}/${limit}\n` +
         `**Vouches remaining:** ${remaining}`
       );
-
     } catch (error) {
       console.error("[ZOMB VOUCH ERROR]", error);
 
@@ -1325,14 +1259,14 @@ if (
     const guildId = message.guild.id;
     const trusted = antiNukeData.trusted[guildId] || [];
 
-   if (
-  message.author.id !== message.guild.ownerId &&
-  !trusted.includes(message.author.id)
-) {
-  return message.reply(
-    "❌ Only trusted members can view their vouch usage."
-  );
-}
+    if (
+      message.author.id !== message.guild.ownerId &&
+      !trusted.includes(message.author.id)
+    ) {
+      return message.reply(
+        "❌ Only trusted members can view their vouch usage."
+      );
+    }
 
     const voucherData =
       antiNukeData.vouches?.[guildId]?.[message.author.id] || {
@@ -1351,7 +1285,6 @@ if (
       `**Admin remaining:** ${VOUCH_LIMITS.admin - adminUsed}`
     );
   }
-
 
   // ==========================================
   // ANTI-NUKE COMMANDS
@@ -1611,61 +1544,6 @@ if (
     antiNukeData.logs[guildId] = channelId;
     saveAntiNukeData();
 
-    return message.reply(
-      `✅ ZOMB logging channel set to ${logChannel}.`
-    );
-  }
-
-  // ==========================================
-  // HELP
-  // ==========================================
-
-  return message.reply(
-    "**ZOMB SECURITY COMMANDS**\n\n" +
-    "`~vouch @member staff @role` — Vouch for Staff\n" +
-    "`~vouch @member admin @role` — Vouch for Admin\n" +
-    "`~vouchlist` — View your vouch usage\n" +
-    "`~an trust @user` — Trust a member\n" +
-    "`~an untrust @user` — Remove trusted member\n" +
-    "`~an trustlist` — View trusted members\n" +
-    "`~an enable` — Enable detection\n" +
-    "`~an disable` — Disable detection\n" +
-    "`~an antibot enable/disable` — Anti-Bot settings\n" +
-    "`~an punishment enable/disable` — Punishment settings\n" +
-    "`~an status` — View security status\n" +
-    "`~an setlog #channel` — Set logging channel"
-  );
-});
-
-
-  // ==========================================
-  // SET LOG CHANNEL
-  // ==========================================
-
-  if (action === "setlog") {
-    const selectedChannel =
-      message.mentions.channels.first();
-
-    const channelId =
-      selectedChannel?.id || LOG_CHANNEL_ID;
-
-    const logChannel = await message.guild.channels
-      .fetch(channelId)
-      .catch(() => null);
-
-    if (
-      !logChannel ||
-      !logChannel.isTextBased() ||
-      !logChannel.send
-    ) {
-      return message.reply(
-        "❌ ZOMB cannot access that logging channel."
-      );
-    }
-
-    antiNukeData.logs[guildId] = channelId;
-    saveAntiNukeData();
-
     const sent = await sendAntiNukeLog(
       message.guild,
       "LOGGING TEST",
@@ -1689,23 +1567,18 @@ if (
 
   return message.reply(
     "**ZOMB SECURITY COMMANDS**\n\n" +
-    "`~vouch @member staff` — Vouch for Staff\n" +
-    "`~vouch @member admin` — Vouch for Admin\n" +
+    "`~vouch @member staff @role` — Vouch for Staff\n" +
+    "`~vouch @member admin @role` — Vouch for Admin\n" +
     "`~vouchlist` — View your vouch usage\n" +
     "`~an trust @user` — Trust a member\n" +
-    "`~an trust USER_ID` — Trust by ID\n" +
-    "`~an untrust @user` — Remove a trusted member\n" +
-    "`~an untrust USER_ID` — Remove by ID\n" +
+    "`~an untrust @user` — Remove trusted member\n" +
     "`~an trustlist` — View trusted members\n" +
     "`~an enable` — Enable detection\n" +
     "`~an disable` — Disable detection\n" +
-    "`~an antibot enable` — Enable Anti-Bot\n" +
-    "`~an antibot disable` — Disable Anti-Bot\n" +
-    "`~an punishment enable` — Enable automatic punishment\n" +
-    "`~an punishment disable` — Disable automatic punishment\n" +
-    "`~an status` — Check system status\n" +
-    "`~an setlog` — Configure logging\n" +
-    "`~an setlog #channel` — Select a log channel"
+    "`~an antibot enable/disable` — Anti-Bot settings\n" +
+    "`~an punishment enable/disable` — Punishment settings\n" +
+    "`~an status` — View security status\n" +
+    "`~an setlog #channel` — Set logging channel"
   );
 });
 
