@@ -1352,6 +1352,7 @@ if (
     );
   }
 
+
   // ==========================================
   // ANTI-NUKE COMMANDS
   // ==========================================
@@ -1365,7 +1366,7 @@ if (
   }
 
   const action = (args[1] || "").toLowerCase();
-  
+  const guildId = message.guild.id;
 
   // ==========================================
   // ANTI-BOT SETTINGS
@@ -1378,18 +1379,14 @@ if (
       antiNukeData.antiBot[guildId] = true;
       saveAntiNukeData();
 
-      return message.reply(
-        "🛡️ ZOMB Anti-Bot ENABLED!"
-      );
+      return message.reply("🛡️ ZOMB Anti-Bot ENABLED!");
     }
 
     if (setting === "disable") {
       antiNukeData.antiBot[guildId] = false;
       saveAntiNukeData();
 
-      return message.reply(
-        "⚠️ ZOMB Anti-Bot DISABLED!"
-      );
+      return message.reply("⚠️ ZOMB Anti-Bot DISABLED!");
     }
 
     return message.reply(
@@ -1401,7 +1398,7 @@ if (
     antiNukeData.trusted[guildId] = [];
   }
 
-  const trusted = antiNukeData.trusted[guildId] || [];
+  const trustedList = antiNukeData.trusted[guildId];
 
   // ==========================================
   // TRUST MEMBER
@@ -1432,25 +1429,18 @@ if (
       );
     }
 
-    if (trusted.includes(userId)) {
+    if (trustedList.includes(userId)) {
       return message.reply(
         "⚠️ This member is already trusted."
       );
     }
 
-    trusted.push(userId);
+    trustedList.push(userId);
     saveAntiNukeData();
 
-    const embed = new EmbedBuilder()
-      .setColor(0x8B0000)
-      .setTitle("ZOMB | TRUST SYSTEM")
-      .setDescription(
-        `**${trustedUser.username}** is now on the trust team.`
-      )
-      .setFooter({ text: "ZOMB ANTINUKE" })
-      .setTimestamp();
-
-    return message.reply({ embeds: [embed] });
+    return message.reply(
+      `✅ ${trustedUser.username} is now trusted by ZOMB.`
+    );
   }
 
   // ==========================================
@@ -1468,37 +1458,20 @@ if (
       );
     }
 
-    const trustedUser = await client.users
-      .fetch(userId)
-      .catch(() => null);
-
-    if (!trustedUser) {
-      return message.reply(
-        "❌ Could not find that Discord user."
-      );
-    }
-
-    if (!trusted.includes(userId)) {
+    if (!trustedList.includes(userId)) {
       return message.reply(
         "⚠️ This member is not trusted."
       );
     }
 
     antiNukeData.trusted[guildId] =
-      trusted.filter(id => id !== userId);
+      trustedList.filter(id => id !== userId);
 
     saveAntiNukeData();
 
-    const embed = new EmbedBuilder()
-      .setColor(0x8B0000)
-      .setTitle("ZOMB | TRUST SYSTEM")
-      .setDescription(
-        `**${trustedUser.username}** was removed from the trust team.`
-      )
-      .setFooter({ text: "ZOMB ANTINUKE" })
-      .setTimestamp();
-
-    return message.reply({ embeds: [embed] });
+    return message.reply(
+      `✅ <@${userId}> was removed from the ZOMB trustlist.`
+    );
   }
 
   // ==========================================
@@ -1506,14 +1479,14 @@ if (
   // ==========================================
 
   if (action === "trustlist") {
-    if (trusted.length === 0) {
+    if (trustedList.length === 0) {
       return message.reply(
         "The ZOMB trusted team is currently empty."
       );
     }
 
     const members = await Promise.all(
-      trusted.map(id =>
+      trustedList.map(id =>
         client.users.fetch(id).catch(() => null)
       )
     );
@@ -1525,10 +1498,7 @@ if (
     const embed = new EmbedBuilder()
       .setColor(0x8B0000)
       .setTitle("ZOMB | TRUST TEAM")
-      .setDescription(
-        usernames.join("\n") ||
-        "No available usernames found."
-      )
+      .setDescription(usernames.join("\n"))
       .setFooter({
         text: `ZOMB ANTINUKE • ${usernames.length} Trusted Members`
       })
@@ -1546,9 +1516,7 @@ if (
     saveAntiNukeData();
 
     return message.reply(
-      "🛡️ **ZOMB Detection Enabled**\n" +
-      "Security monitoring is now active.\n" +
-      "Automatic punishment remains controlled separately."
+      "🛡️ ZOMB Detection Enabled!"
     );
   }
 
@@ -1561,7 +1529,7 @@ if (
     saveAntiNukeData();
 
     return message.reply(
-      "⚠️ **ZOMB Detection Disabled**"
+      "⚠️ ZOMB Detection Disabled!"
     );
   }
 
@@ -1577,8 +1545,7 @@ if (
       saveAntiNukeData();
 
       return message.reply(
-        "⚠️ **Automatic punishment ENABLED.**\n" +
-        "ZOMB may remove manageable roles and permanently ban detected attackers after a configured threshold."
+        "⚠️ Automatic punishment ENABLED."
       );
     }
 
@@ -1587,7 +1554,7 @@ if (
       saveAntiNukeData();
 
       return message.reply(
-        "🛡️ Automatic punishment disabled. Detection and logging can continue."
+        "🛡️ Automatic punishment DISABLED."
       );
     }
 
@@ -1608,18 +1575,68 @@ if (
       antiNukeData.punishment[guildId] === true;
 
     return message.reply(
-      `🛡️ **ZOMB SECURITY STATUS**\n\n` +
-      `**Detection:** ${enabled ? "ENABLED" : "DISABLED"}\n` +
-      `**Automatic Punishment:** ${punishment ? "ENABLED" : "DISABLED"}\n` +
-      `**Anti-Bot:** ${antiNukeData.antiBot[guildId] ? "ENABLED" : "DISABLED"}\n` +
-      `**Trusted Members:** ${trusted.length}\n` +
-      `**Logging:** ${antiNukeData.logs[guildId] ? "CONFIGURED" : "DEFAULT CHANNEL"}\n` +
-      `**Anti-Spam:** ${enabled ? "ACTIVE" : "INACTIVE"}\n` +
-      `**Anti-Link:** ${enabled ? "ACTIVE" : "INACTIVE"}\n` +
-      `**Anti-Invite:** ${enabled ? "ACTIVE" : "INACTIVE"}\n` +
-      `**Anti-Raid:** ${enabled ? "ACTIVE" : "INACTIVE"}`
+      `🛡️ ZOMB SECURITY STATUS\n\n` +
+      `Detection: ${enabled ? "ENABLED" : "DISABLED"}\n` +
+      `Automatic Punishment: ${punishment ? "ENABLED" : "DISABLED"}\n` +
+      `Anti-Bot: ${antiNukeData.antiBot[guildId] ? "ENABLED" : "DISABLED"}\n` +
+      `Trusted Members: ${trustedList.length}`
     );
   }
+
+  // ==========================================
+  // SET LOG CHANNEL
+  // ==========================================
+
+  if (action === "setlog") {
+    const selectedChannel =
+      message.mentions.channels.first();
+
+    const channelId =
+      selectedChannel?.id || LOG_CHANNEL_ID;
+
+    const logChannel = await message.guild.channels
+      .fetch(channelId)
+      .catch(() => null);
+
+    if (
+      !logChannel ||
+      !logChannel.isTextBased() ||
+      !logChannel.send
+    ) {
+      return message.reply(
+        "❌ ZOMB cannot access that logging channel."
+      );
+    }
+
+    antiNukeData.logs[guildId] = channelId;
+    saveAntiNukeData();
+
+    return message.reply(
+      `✅ ZOMB logging channel set to ${logChannel}.`
+    );
+  }
+
+  // ==========================================
+  // HELP
+  // ==========================================
+
+  return message.reply(
+    "**ZOMB SECURITY COMMANDS**\n\n" +
+    "`~vouch @member staff @role` — Vouch for Staff\n" +
+    "`~vouch @member admin @role` — Vouch for Admin\n" +
+    "`~vouchlist` — View your vouch usage\n" +
+    "`~an trust @user` — Trust a member\n" +
+    "`~an untrust @user` — Remove trusted member\n" +
+    "`~an trustlist` — View trusted members\n" +
+    "`~an enable` — Enable detection\n" +
+    "`~an disable` — Disable detection\n" +
+    "`~an antibot enable/disable` — Anti-Bot settings\n" +
+    "`~an punishment enable/disable` — Punishment settings\n" +
+    "`~an status` — View security status\n" +
+    "`~an setlog #channel` — Set logging channel"
+  );
+});
+
 
   // ==========================================
   // SET LOG CHANNEL
