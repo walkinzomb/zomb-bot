@@ -1401,7 +1401,7 @@ if (
     antiNukeData.trusted[guildId] = [];
   }
 
-  const trusted = antiNukeData.trusted[guildId];
+  const trusted = antiNukeData.trusted[guildId] || [];
 
   // ==========================================
   // TRUST MEMBER
