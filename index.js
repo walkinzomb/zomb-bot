@@ -3219,8 +3219,8 @@ if (command === "~jail" || command === "~unjail") {
         return message.reply("ZOMB could not save the whitelist change.");
       }
 
-      return message.reply(
-  `<@${user.id}> (${user.id}) has now been whitelisted and will not trigger Anti Nuke.`
+    return message.reply(
+  `<@${userId}> (${userId}) has now been whitelisted and will not trigger Anti Nuke.`
 );
     }
 
@@ -3250,8 +3250,8 @@ if (command === "~jail" || command === "~unjail") {
         return message.reply("ZOMB could not save the whitelist change.");
       }
 
-      return message.reply(
-  `<@${user.id}> (${user.id}) has been removed from the Anti Nuke whitelist.`
+   return message.reply(
+  `<@${userId}> (${userId}) has been removed from the Anti Nuke whitelist.`
 );
     }
 
