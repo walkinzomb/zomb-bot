@@ -2234,3 +2234,66 @@ async function start() {
 start().catch(error => {
   console.error("[ZOMB START ERROR]", error);
 });
+// ==========================================
+// VOUCH RESET — SERVER OWNER ONLY
+// ==========================================
+if (command === "vouchreset") {
+  if (message.author.id !== message.guild.ownerId) {
+    return message.reply({
+      embeds: [
+        new EmbedBuilder()
+          .setColor(0xED4245)
+          .setTitle("ZOMB | Permission Denied")
+          .setDescription("Only the server owner can use this command.")
+      ]
+    });
+  }
+
+  const target = message.mentions.users.first();
+  const resetAll = args[0]?.toLowerCase() === "all";
+
+  if (!resetAll && !target) {
+    return message.reply({
+      embeds: [
+        new EmbedBuilder()
+          .setColor(0x2B2D31)
+          .setTitle("ZOMB | Vouch Reset")
+          .setDescription(
+            "**Usage:**\n" +
+            "`~vouchreset @member` — Reset one member\n" +
+            "`~vouchreset all` — Reset everyone"
+          )
+      ]
+    });
+  }
+
+  const guildId = message.guild.id;
+
+  antiNukeData.vouches[guildId] ||= {};
+  antiNukeData.vouchRoles[guildId] ||= {};
+
+  if (resetAll) {
+    antiNukeData.vouches[guildId] = {};
+    antiNukeData.vouchRoles[guildId] = {};
+  } else {
+    delete antiNukeData.vouches[guildId][target.id];
+    delete antiNukeData.vouchRoles[guildId][target.id];
+  }
+
+  saveAntiNukeData();
+
+  return message.reply({
+    embeds: [
+      new EmbedBuilder()
+        .setColor(0x57F287)
+        .setTitle("ZOMB | Vouches Reset")
+        .setDescription(
+          resetAll
+            ? "All trusted members' Staff and Admin vouch records have been reset."
+            : `Vouch records for <@${target.id}> have been reset.`
+        )
+        .setFooter({ text: "Existing Discord roles were not removed." })
+        .setTimestamp()
+    ]
+  });
+}
