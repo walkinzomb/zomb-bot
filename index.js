@@ -3220,8 +3220,8 @@ if (command === "~jail" || command === "~unjail") {
       }
 
       return message.reply(
-        `✅ ${member.user.username} has been added to the anti-nuke whitelist.`
-      );
+  `<@${user.id}> (${user.id}) has now been whitelisted and will not trigger Anti Nuke.`
+);
     }
 
     // REMOVE MEMBER
@@ -3251,8 +3251,8 @@ if (command === "~jail" || command === "~unjail") {
       }
 
       return message.reply(
-        `✅ <@${userId}> has been removed from the anti-nuke whitelist.`
-      );
+  `<@${user.id}> (${user.id}) has been removed from the Anti Nuke whitelist.`
+);
     }
 
     // VIEW WHITELIST
