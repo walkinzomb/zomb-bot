@@ -17,7 +17,6 @@ const {
 // ZOMB CONFIGURATION
 // ==========================================
 
-
 const DATA_FILE = process.env.ANTINUKE_FILE ||
   path.join("/data", "antinuke.json");
 
@@ -60,7 +59,6 @@ let antiNukeData = {
   antiBot: {}
 };
 
-
 function loadAntiNukeData() {
   try {
     const legacyFile = path.join(__dirname, "antinuke.json");
@@ -81,23 +79,23 @@ function loadAntiNukeData() {
         punishment: saved.punishment || {},
         antiBot: saved.antiBot || {}
       };
-
-      fs.mkdirSync(path.dirname(DATA_FILE), {
-        recursive: true
-      });
-
-      fs.writeFileSync(
-        DATA_FILE,
-        JSON.stringify(antiNukeData, null, 2)
-      );
-
-      console.log("[ZOMB] Anti-Nuke data loaded and saved to persistent storage.");
     }
+
+    fs.mkdirSync(path.dirname(DATA_FILE), {
+      recursive: true
+    });
+
+    fs.writeFileSync(
+      DATA_FILE,
+      JSON.stringify(antiNukeData, null, 2)
+    );
+
+    console.log("[ZOMB] Data loaded from persistent storage.");
+
   } catch (error) {
     console.error("[ZOMB DATA ERROR]", error);
   }
 }
-
 
 function saveAntiNukeData() {
   try {
@@ -230,7 +228,6 @@ async function sendAntiNukeLog(guild, title, description) {
 
     await logChannel.send({ embeds: [embed] });
 
-    console.log("[ZOMB] Log message sent successfully.");
     return true;
 
   } catch (error) {
@@ -300,11 +297,9 @@ async function checkAntiLink(message) {
   const inviteRegex =
     /(?:https?:\/\/)?(?:www\.)?(?:discord\.gg|discord(?:app)?\.com\/invite)\/[A-Za-z0-9-]+/gi;
 
-  // Discord invites are handled by Anti-Invite instead.
   if (inviteRegex.test(message.content)) return;
 
-  const linkRegex =
-    /https?:\/\/\S+|www\.\S+/gi;
+  const linkRegex = /https?:\/\/\S+|www\.\S+/gi;
 
   const links = message.content.match(linkRegex);
   if (!links) return;
@@ -715,9 +710,9 @@ client.on("guildMemberRemove", member => {
   );
 });
 
- // ==========================================
- // ANTI-BOT PROTECTION
- // ==========================================
+// ==========================================
+// ANTI-BOT PROTECTION
+// ==========================================
 
 async function checkAntiBot(member) {
   if (!member.guild || !member.user.bot) return;
@@ -806,12 +801,16 @@ async function checkAntiBot(member) {
 // MEMBER JOIN / BOT ADDITION / ANTI-RAID
 // ==========================================
 
-
 client.on("guildMemberAdd", member => {
   checkAntiRaid(member).catch(error => {
     console.error("[ZOMB ANTI-RAID ERROR]", error);
   });
-    if (!member.user.bot) return;
+
+  if (!member.user.bot) return;
+
+  checkAntiBot(member).catch(error => {
+    console.error("[ZOMB ANTI-BOT ERROR]", error);
+  });
 
   processAuditEntries(
     member.guild,
@@ -820,8 +819,6 @@ client.on("guildMemberAdd", member => {
     member.id
   );
 });
-
-
 
 // ==========================================
 // WEBHOOK PROTECTION
@@ -927,6 +924,7 @@ client.on("interactionCreate", async interaction => {
     return interaction.reply({
       content:
         "**ZOMB COMMANDS**\n\n" +
+        "`~nuke` — Restart the current channel\n" +
         "`~an` — Anti-Nuke help\n" +
         "`~an status` — Protection status\n" +
         "`~an trust @user` — Trust a member\n" +
@@ -934,6 +932,8 @@ client.on("interactionCreate", async interaction => {
         "`~an trustlist` — View trusted members\n" +
         "`~an enable` — Enable detection\n" +
         "`~an disable` — Disable detection\n" +
+        "`~an antibot enable` — Enable Anti-Bot\n" +
+        "`~an antibot disable` — Disable Anti-Bot\n" +
         "`~an punishment enable` — Enable automatic punishment\n" +
         "`~an punishment disable` — Disable automatic punishment",
       ephemeral: true
@@ -963,6 +963,113 @@ client.on("messageCreate", async message => {
   const args = message.content.trim().split(/\s+/);
   const command = args[0].toLowerCase();
 
+  // ==========================================
+  // ZOMB CHANNEL NUKE
+  // ==========================================
+
+  if (command === "~nuke") {
+    if (message.author.id !== message.guild.ownerId) {
+      return message.reply(
+        "❌ Only the server owner can use ~nuke."
+      );
+    }
+
+    if (message.channel.isThread()) {
+      return message.reply(
+        "❌ You cannot nuke a thread."
+      );
+    }
+
+    const botMember = message.guild.members.me;
+
+    if (
+      !botMember ||
+      !botMember.permissions.has(
+        PermissionsBitField.Flags.ManageChannels
+      )
+    ) {
+      return message.reply(
+        "❌ ZOMB needs Manage Channels permission."
+      );
+    }
+
+    if (
+      !message.channel.deletable ||
+      !message.channel.manageable
+    ) {
+      return message.reply(
+        "❌ ZOMB cannot delete or clone this channel. Check its permissions."
+      );
+    }
+
+    const oldChannel = message.channel;
+
+    let prompt;
+
+    try {
+      prompt = await message.reply(
+        "💣 **Are you sure you want to nuke this channel?**\n\n" +
+        "React with 💣 within 5 seconds to confirm.\n" +
+        "If you don't react, the nuke will be cancelled."
+      );
+
+      await prompt.react("💣");
+
+      const collected = await prompt.awaitReactions({
+        filter: (reaction, user) =>
+          reaction.emoji.name === "💣" &&
+          user.id === message.guild.ownerId,
+        max: 1,
+        time: 5000
+      });
+
+      if (!collected.size) {
+        await prompt.edit(
+          "⏰ **NUKE CANCELLED**\nYou did not confirm within 5 seconds."
+        );
+
+        return;
+      }
+
+      const newChannel = await oldChannel.clone({
+        reason: `Channel nuke requested by ${message.author.tag}`
+      });
+
+      try {
+        await oldChannel.delete(
+          "ZOMB channel nuke confirmed"
+        );
+      } catch (error) {
+        console.error("[ZOMB NUKE DELETE ERROR]", error);
+
+        await newChannel.delete(
+          "ZOMB nuke rollback because original channel could not be deleted"
+        ).catch(() => {});
+
+        throw error;
+      }
+
+      await newChannel.send(
+        "💣 **CHANNEL NUKE COMPLETE**\n" +
+        "This channel has been freshly restarted by ZOMB."
+      );
+
+    } catch (error) {
+      console.error("[ZOMB NUKE ERROR]", error);
+
+      await message.channel.send(
+        "❌ **CHANNEL NUKE FAILED**\n" +
+        "ZOMB could not complete the channel restart. Check its permissions."
+      ).catch(() => {});
+    }
+
+    return;
+  }
+
+  // ==========================================
+  // ANTI-NUKE COMMANDS
+  // ==========================================
+
   if (command !== "~an" && command !== "~antinuke") return;
 
   if (message.author.id !== message.guild.ownerId) {
@@ -972,34 +1079,37 @@ client.on("messageCreate", async message => {
   }
 
   const action = (args[1] || "").toLowerCase();
-  
-if (action === "antibot") {
-  const setting = (args[2] || "").toLowerCase();
-
-  if (setting === "enable") {
-    antiNukeData.antiBot[guildId] = true;
-    saveAntiNukeData();
-
-    return message.reply(
-      "🛡️ ZOMB Anti-Bot ENABLED!"
-    );
-  }
-
-  if (setting === "disable") {
-    antiNukeData.antiBot[guildId] = false;
-    saveAntiNukeData();
-
-    return message.reply(
-      "⚠️ ZOMB Anti-Bot DISABLED!"
-    );
-  }
-
-  return message.reply(
-    "Usage: `~an antibot enable` or `~an antibot disable`"
-  );
-}
-
   const guildId = message.guild.id;
+
+  // ==========================================
+  // ANTI-BOT SETTINGS
+  // ==========================================
+
+  if (action === "antibot") {
+    const setting = (args[2] || "").toLowerCase();
+
+    if (setting === "enable") {
+      antiNukeData.antiBot[guildId] = true;
+      saveAntiNukeData();
+
+      return message.reply(
+        "🛡️ ZOMB Anti-Bot ENABLED!"
+      );
+    }
+
+    if (setting === "disable") {
+      antiNukeData.antiBot[guildId] = false;
+      saveAntiNukeData();
+
+      return message.reply(
+        "⚠️ ZOMB Anti-Bot DISABLED!"
+      );
+    }
+
+    return message.reply(
+      "Usage: `~an antibot enable` or `~an antibot disable`"
+    );
+  }
 
   if (!Array.isArray(antiNukeData.trusted[guildId])) {
     antiNukeData.trusted[guildId] = [];
@@ -1007,7 +1117,9 @@ if (action === "antibot") {
 
   const trusted = antiNukeData.trusted[guildId];
 
+  // ==========================================
   // TRUST MEMBER
+  // ==========================================
 
   if (action === "trust") {
     const userId =
@@ -1055,7 +1167,9 @@ if (action === "antibot") {
     return message.reply({ embeds: [embed] });
   }
 
+  // ==========================================
   // UNTRUST MEMBER
+  // ==========================================
 
   if (action === "untrust") {
     const userId =
@@ -1101,7 +1215,9 @@ if (action === "antibot") {
     return message.reply({ embeds: [embed] });
   }
 
+  // ==========================================
   // TRUST LIST
+  // ==========================================
 
   if (action === "trustlist") {
     if (trusted.length === 0) {
@@ -1135,7 +1251,9 @@ if (action === "antibot") {
     return message.reply({ embeds: [embed] });
   }
 
+  // ==========================================
   // ENABLE DETECTION
+  // ==========================================
 
   if (action === "enable") {
     antiNukeData.enabled[guildId] = true;
@@ -1148,7 +1266,9 @@ if (action === "antibot") {
     );
   }
 
+  // ==========================================
   // DISABLE DETECTION
+  // ==========================================
 
   if (action === "disable") {
     antiNukeData.enabled[guildId] = false;
@@ -1159,7 +1279,9 @@ if (action === "antibot") {
     );
   }
 
+  // ==========================================
   // AUTOMATIC PUNISHMENT
+  // ==========================================
 
   if (action === "punishment") {
     const setting = (args[2] || "").toLowerCase();
@@ -1188,7 +1310,9 @@ if (action === "antibot") {
     );
   }
 
+  // ==========================================
   // STATUS
+  // ==========================================
 
   if (action === "status") {
     const enabled =
@@ -1201,6 +1325,7 @@ if (action === "antibot") {
       `🛡️ **ZOMB SECURITY STATUS**\n\n` +
       `**Detection:** ${enabled ? "ENABLED" : "DISABLED"}\n` +
       `**Automatic Punishment:** ${punishment ? "ENABLED" : "DISABLED"}\n` +
+      `**Anti-Bot:** ${antiNukeData.antiBot[guildId] ? "ENABLED" : "DISABLED"}\n` +
       `**Trusted Members:** ${trusted.length}\n` +
       `**Logging:** ${antiNukeData.logs[guildId] ? "CONFIGURED" : "DEFAULT CHANNEL"}\n` +
       `**Anti-Spam:** ${enabled ? "ACTIVE" : "INACTIVE"}\n` +
@@ -1210,7 +1335,9 @@ if (action === "antibot") {
     );
   }
 
+  // ==========================================
   // SET LOG CHANNEL
+  // ==========================================
 
   if (action === "setlog") {
     const selectedChannel =
@@ -1253,7 +1380,9 @@ if (action === "antibot") {
     );
   }
 
+  // ==========================================
   // HELP
+  // ==========================================
 
   return message.reply(
     "**ZOMB SECURITY COMMANDS**\n\n" +
@@ -1264,6 +1393,8 @@ if (action === "antibot") {
     "`~an trustlist` — View trusted members\n" +
     "`~an enable` — Enable detection\n" +
     "`~an disable` — Disable detection\n" +
+    "`~an antibot enable` — Enable Anti-Bot\n" +
+    "`~an antibot disable` — Disable Anti-Bot\n" +
     "`~an punishment enable` — Enable automatic punishment\n" +
     "`~an punishment disable` — Disable automatic punishment\n" +
     "`~an status` — Check system status\n" +
