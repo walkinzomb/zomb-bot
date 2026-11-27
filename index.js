@@ -1879,11 +1879,48 @@ client.on("messageCreate", async message => {
 
   const args = message.content.trim().split(/\s+/);
   const command = args[0].toLowerCase();
-  // ==========================================
-// ZOMB SNIPE COMMAND
+  
+// ==========================================
+// ZOMB SNIPE COMMANDS
 // ==========================================
 
-if (command === "~snipe") {
+if (command === "~snipe" || command === "~s" || command === "~cs") {
+
+  // CLEAR ALL SERVER SNIPES
+  if (
+    (command === "~snipe" && args[1]?.toLowerCase() === "clear" && args[2]?.toLowerCase() === "all") ||
+    (command === "~cs" && args[1]?.toLowerCase() === "all")
+  ) {
+    if (!message.member.permissions.has(PermissionsBitField.Flags.Administrator)) {
+      return message.reply("❌ You need Administrator permission to clear all server snipes.");
+    }
+
+    let cleared = 0;
+
+    message.guild.channels.cache.forEach(channel => {
+      if (snipeCache.has(channel.id)) {
+        snipeCache.delete(channel.id);
+        cleared++;
+      }
+    });
+
+    return message.reply(`✅ Cleared snipe history from ${cleared} server channels.`);
+  }
+
+  // CLEAR CURRENT CHANNEL
+  if (
+    (command === "~snipe" && args[1]?.toLowerCase() === "clear") ||
+    command === "~cs"
+  ) {
+    const deleted = snipeCache.get(message.channel.id) || [];
+    const count = deleted.length;
+
+    snipeCache.delete(message.channel.id);
+
+    return message.reply(`✅ Cleared ${count} saved snipes in this channel.`);
+  }
+
+  // DISPLAY SNIPE
   const requested = Number(args[1] || 1);
 
   if (!Number.isInteger(requested) || requested < 1 || requested > SNIPE_LIMIT) {
@@ -1928,6 +1965,7 @@ if (command === "~snipe") {
 
   return message.reply({ embeds: [embed] });
 }
+
   if (command === "~tictactoe" || command === "~ttt") {
     console.log("[ZOMB COMMAND]", message.content);
   console.log("ZOMB DETECTED TIC TAC TOE COMMAND");
