@@ -1995,6 +1995,11 @@ if (command === "~help") {
         "`~tictactoe @user` — Challenge someone to Tic-Tac-Toe\n" +
         "`~ttt @user` — Shortcut for Tic-Tac-Toe\n\n" +
         "`~snipe [number]` — View recently deleted messages\n" +
+        "`~snipe [number]` — View deleted messages\n" +
+"`~s [number]` — Snipe shortcut\n" +
+"`~snipe clear` — Clear this channel's snipes\n" +
+"`~cs` — Clear snipe shortcut\n" +
+"`~snipe clear all` — Clear all server snipes (Admin)\n\n" +
         "**VOUCH SYSTEM**\n" +
         "`~vouch @member` — Start a Staff or Admin vouch\n" +
         "`~vouchlist` — View your vouch usage\n" +
@@ -2008,6 +2013,7 @@ if (command === "~help") {
         "`~an trustlist` — View trusted members\n" +
         "`~an enable/disable` — Configure detection\n" +
         "`~an antibot enable/disable` — Configure Anti-Bot\n" +
+        "`~snipe [number]` — View deleted messages\n" +
         "`~an punishment enable/disable` — Configure punishment",
         
         0x5865F2
