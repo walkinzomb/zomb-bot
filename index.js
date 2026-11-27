@@ -1877,6 +1877,55 @@ client.on("messageCreate", async message => {
 
   const args = message.content.trim().split(/\s+/);
   const command = args[0].toLowerCase();
+  // ==========================================
+// ZOMB SNIPE COMMAND
+// ==========================================
+
+if (command === "~snipe") {
+  const requested = Number(args[1] || 1);
+
+  if (!Number.isInteger(requested) || requested < 1 || requested > SNIPE_LIMIT) {
+    return message.reply(
+      `Choose a snipe number from 1 to ${SNIPE_LIMIT}. Usage: \`~snipe [number]\``
+    );
+  }
+
+  const deletedMessages = snipeCache.get(message.channel.id) || [];
+  const sniped = deletedMessages[requested - 1];
+
+  if (!sniped) {
+    return message.reply(
+      `There isn't a deleted message #${requested} saved in this channel.`
+    );
+  }
+
+  const embed = zombEmbed(
+    `SNIPE ${requested}`,
+    `**Author:** <@${sniped.authorId}> (${sniped.author})\n` +
+    `**Deleted:** <t:${Math.floor(sniped.deletedAt / 1000)}:R>\n\n` +
+    `**Message:**\n${sniped.content.slice(0, 3000)}`,
+    0x5865F2
+  );
+
+  const imageUrl = sniped.attachments.find(url =>
+    /\.(png|jpe?g|gif|webp)(\?.*)?$/i.test(url)
+  );
+
+  if (imageUrl) embed.setImage(imageUrl);
+
+  if (sniped.attachments.length) {
+    const attachmentText = sniped.attachments
+      .map((url, index) => `[Attachment ${index + 1}](${url})`)
+      .join("\n");
+
+    embed.addFields({
+      name: "Attachments",
+      value: attachmentText.slice(0, 1000)
+    });
+  }
+
+  return message.reply({ embeds: [embed] });
+}
   if (command === "~tictactoe" || command === "~ttt") {
     console.log("[ZOMB COMMAND]", message.content);
   console.log("ZOMB DETECTED TIC TAC TOE COMMAND");
