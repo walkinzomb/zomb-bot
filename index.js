@@ -2938,6 +2938,7 @@ if (command === "~jail" || command === "~unjail") {
   // ==========================================
 
  
+  
   if (command === "~vouchlist") {
     const guildId = message.guild.id;
 
@@ -2949,6 +2950,15 @@ if (command === "~jail" || command === "~unjail") {
 
     const staffUsed = voucherData.staff.length;
     const adminUsed = voucherData.admin.length;
+
+    const personalVouches = [
+      ...voucherData.staff.map(id => `• <@${id}> (\`${id}\`) — **STAFF**`),
+      ...voucherData.admin.map(id => `• <@${id}> (\`${id}\`) — **ADMIN**`)
+    ];
+
+    const personalList = personalVouches.length
+      ? personalVouches.join("\n")
+      : "You haven't vouched for anyone yet.";
 
     const allVouches = antiNukeData.vouches[guildId] || {};
     const vouchedMembers = new Set();
@@ -2967,7 +2977,7 @@ if (command === "~jail" || command === "~unjail") {
     }
 
     const vouchList = vouchLines.length
-      ? vouchLines.join("\n").slice(0, 3500)
+      ? vouchLines.join("\n").slice(0, 3000)
       : "No members have been vouched yet.";
 
     const embed = new EmbedBuilder()
@@ -2977,6 +2987,7 @@ if (command === "~jail" || command === "~unjail") {
         `**YOUR VOUCH USAGE**\n` +
         `Staff: ${staffUsed}/${VOUCH_LIMITS.staff} (${VOUCH_LIMITS.staff - staffUsed} remaining)\n` +
         `Admin: ${adminUsed}/${VOUCH_LIMITS.admin} (${VOUCH_LIMITS.admin - adminUsed} remaining)\n\n` +
+        `**YOUR VOUCHED MEMBERS**\n${personalList}\n\n` +
         `**SERVER VOUCHES**\n${vouchList}`
       )
       .setFooter({
@@ -2985,6 +2996,7 @@ if (command === "~jail" || command === "~unjail") {
 
     return message.reply({ embeds: [embed] });
   }
+
 
 
   // ==========================================
