@@ -1067,7 +1067,7 @@ function buildTicTacToeRows(gameId, game) {
       buttons.push(
         new ButtonBuilder()
           .setCustomId(`zomb_ttt|${gameId}|${index}`)
-          .setLabel(mark || "・")
+          .setLabel(mark || "_")
           .setStyle(
             mark === "X"
               ? ButtonStyle.Primary
