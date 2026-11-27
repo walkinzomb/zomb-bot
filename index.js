@@ -1843,6 +1843,7 @@ client.on("messageDelete", async message => {
       attachments: [...message.attachments.values()].map(a => a.url),
       deletedAt: Date.now()
     });
+    console.log("[ZOMB SNIPE] Saved messages in channel:", deletedMessages.length);
 
     if (deletedMessages.length > SNIPE_LIMIT) {
       deletedMessages.length = SNIPE_LIMIT;
