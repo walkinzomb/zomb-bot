@@ -104,8 +104,8 @@ let antiNukeData = {
   antiBot: {},
   vouches: {},
   vouchRoles: {},
-  jailRoles: {}
-  jailChannels: {},
+  jailRoles: {},
+  jailChannels: {}
   
 };
 
