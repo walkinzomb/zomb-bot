@@ -126,7 +126,7 @@ function loadAntiNukeData() {
         punishment: saved.punishment || {},
         antiBot: saved.antiBot || {},
         vouches: saved.vouches || {},
-        vouchRoles: saved.vouchRoles || {}
+        vouchRoles: saved.vouchRoles || {},
         jailRoles: saved.jailRoles || {}
       };
     }
