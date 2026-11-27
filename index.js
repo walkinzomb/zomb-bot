@@ -1948,11 +1948,27 @@ if (
       message.mentions.roles.first()?.id ||
       args.slice(1).join(" ").trim();
 
-    const role = message.guild.roles.cache.find(
-      r =>
-        r.id === roleInput ||
-        r.name.toLowerCase() === roleInput.toLowerCase()
-    );
+    const roleSearch = roleInput
+  .toLowerCase()
+  .replace(/[‘’]/g, "'")
+  .trim();
+
+const matches = message.guild.roles.cache.filter(r => {
+  const name = r.name
+    .toLowerCase()
+    .replace(/[‘’]/g, "'")
+    .trim();
+
+  return r.id === roleInput || name.includes(roleSearch);
+});
+
+if (matches.size > 1) {
+  return message.reply(
+    `Multiple roles match "${roleInput}": ${matches.map(r => r.name).join(", ")}`
+  );
+}
+
+const role = matches.first();
 
     if (!role) {
       return message.reply("I couldn't find that role in this server.");
