@@ -102,12 +102,14 @@ const commands = [
     .setDescription("View ZOMB commands")
 ].map(command => command.toJSON());
 
+
 // ==========================================
 // DATA STORAGE
 // ==========================================
 
 let antiNukeData = {
   trusted: {},
+  whitelist: {},
   enabled: {},
   logs: {},
   punishment: {},
@@ -116,7 +118,6 @@ let antiNukeData = {
   vouchRoles: {},
   jailRoles: {},
   jailChannels: {}
-  
 };
 
 function loadAntiNukeData() {
@@ -124,6 +125,7 @@ function loadAntiNukeData() {
     if (!fs.existsSync(DATA_FILE)) {
       return {
         trusted: {},
+        whitelist: {},
         enabled: {},
         logs: {},
         punishment: {},
@@ -139,6 +141,7 @@ function loadAntiNukeData() {
 
     return {
       trusted: saved.trusted || {},
+      whitelist: saved.whitelist || {},
       enabled: saved.enabled || {},
       logs: saved.logs || {},
       punishment: saved.punishment || {},
@@ -151,9 +154,9 @@ function loadAntiNukeData() {
 
   } catch (error) {
     console.error("[ZOMB] Failed to load anti-nuke data:", error);
-
     return {
       trusted: {},
+      whitelist: {},
       enabled: {},
       logs: {},
       punishment: {},
@@ -184,7 +187,8 @@ function saveAntiNukeData() {
   }
 }
 
-loadAntiNukeData();
+antiNukeData = loadAntiNukeData();
+
 
 // ==========================================
 // VOUCH SYSTEM
