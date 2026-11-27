@@ -2028,7 +2028,7 @@ for (const mentionedUser of message.mentions.users.values()) {
     }
 
     message.reply(
-      `<@${mentionedUser.id}> is AFK: ${afkData.reason}\nThey have been AFK for ${duration}.`
+      `<@${mentionedUser.id}> is afk: ${afkData.reason}\nThey have been away for ${duration}.`
     );
   }
 }
@@ -2060,7 +2060,7 @@ if (returningAfk) {
   saveAfk();
 
   message.reply(
-    ` **hello, ${message.author.username}!** You were away for **${duration}**.`
+    ` **, ${message.author.username}!** You were away for **${duration}**.`
   );
 }
 // ==========================================
