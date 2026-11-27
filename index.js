@@ -103,7 +103,8 @@ let antiNukeData = {
   punishment: {},
   antiBot: {},
   vouches: {},
-  vouchRoles: {}
+  vouchRoles: {},
+  jailRoles: {}
 };
 
 function loadAntiNukeData() {
@@ -126,6 +127,7 @@ function loadAntiNukeData() {
         antiBot: saved.antiBot || {},
         vouches: saved.vouches || {},
         vouchRoles: saved.vouchRoles || {}
+        jailRoles: saved.jailRoles || {}
       };
     }
 
@@ -983,7 +985,96 @@ client.on("guildUpdate", async (oldGuild, newGuild) => {
     newGuild.id
   );
 });
+// ==========================================
+// ZOMB MODERATION AND TIC TAC TOE HELPERS
+// ==========================================
 
+const ticTacToeGames = new Map();
+
+function parseDuration(value) {
+  const match = String(value || "").match(/^(\d+)(s|m|h|d)$/i);
+  if (!match) return null;
+
+  const amount = Number(match[1]);
+  const unit = match[2].toLowerCase();
+
+  const multipliers = {
+    s: 1000,
+    m: 60000,
+    h: 3600000,
+    d: 86400000
+  };
+
+  const duration = amount * multipliers[unit];
+
+  if (
+    !Number.isFinite(duration) ||
+    duration < 1000 ||
+    duration > 28 * 86400000
+  ) {
+    return null;
+  }
+
+  return duration;
+}
+
+function getTicTacToeWinner(board) {
+  const wins = [
+    [0, 1, 2],
+    [3, 4, 5],
+    [6, 7, 8],
+    [0, 3, 6],
+    [1, 4, 7],
+    [2, 5, 8],
+    [0, 4, 8],
+    [2, 4, 6]
+  ];
+
+  for (const [a, b, c] of wins) {
+    if (
+      board[a] &&
+      board[a] === board[b] &&
+      board[a] === board[c]
+    ) {
+      return board[a];
+    }
+  }
+
+  return null;
+}
+
+function buildTicTacToeRows(gameId, game) {
+  const rows = [];
+
+  for (let row = 0; row < 3; row++) {
+    const buttons = [];
+
+    for (let column = 0; column < 3; column++) {
+      const index = row * 3 + column;
+      const mark = game.board[index];
+
+      buttons.push(
+        new ButtonBuilder()
+          .setCustomId(`zomb_ttt|${gameId}|${index}`)
+          .setLabel(mark || " ")
+          .setStyle(
+            mark === "X"
+              ? ButtonStyle.Primary
+              : mark === "O"
+                ? ButtonStyle.Danger
+                : ButtonStyle.Secondary
+          )
+          .setDisabled(Boolean(mark) || game.finished)
+      );
+    }
+
+    rows.push(
+      new ActionRowBuilder().addComponents(buttons)
+    );
+  }
+
+  return rows;
+}
 // ==========================================
 // SLASH COMMAND REGISTRATION
 // ==========================================
@@ -1022,7 +1113,92 @@ client.on("interactionCreate", async interaction => {
     const originalEditReply = interaction.editReply.bind(interaction);
     interaction.editReply = payload =>
       originalEditReply(zombPayload(payload));
+// ==========================================
+// TIC TAC TOE BUTTONS
+// ==========================================
 
+if (
+  interaction.isButton() &&
+  interaction.customId.startsWith("zomb_ttt|")
+) {
+  const [, gameId, indexText] = interaction.customId.split("|");
+  const index = Number(indexText);
+  const game = ticTacToeGames.get(gameId);
+
+  if (!game) {
+    return interaction.reply({
+      content: "This game has expired.",
+      ephemeral: true
+    });
+  }
+
+  if (
+    interaction.user.id !== game.players.X &&
+    interaction.user.id !== game.players.O
+  ) {
+    return interaction.reply({
+      content: "You are not a player in this game.",
+      ephemeral: true
+    });
+  }
+
+  if (game.finished) {
+    return interaction.reply({
+      content: "This game has already ended.",
+      ephemeral: true
+    });
+  }
+
+  if (interaction.user.id !== game.players[game.turn]) {
+    return interaction.reply({
+      content: "It is not your turn.",
+      ephemeral: true
+    });
+  }
+
+  if (
+    !Number.isInteger(index) ||
+    index < 0 ||
+    index > 8 ||
+    game.board[index]
+  ) {
+    return interaction.reply({
+      content: "That square is unavailable.",
+      ephemeral: true
+    });
+  }
+
+  game.board[index] = game.turn;
+
+  const winner = getTicTacToeWinner(game.board);
+  let result;
+
+  if (winner) {
+    game.finished = true;
+    result = `🏆 <@${game.players[winner]}> wins!`;
+  } else if (game.board.every(Boolean)) {
+    game.finished = true;
+    result = "It's a tie!";
+  } else {
+    game.turn = game.turn === "X" ? "O" : "X";
+    result = `**Turn:** <@${game.players[game.turn]}> (${game.turn})`;
+  }
+
+  await interaction.update({
+    content:
+      `**ZOMB TIC TAC TOE**\n\n` +
+      `❌ X: <@${game.players.X}>\n` +
+      `⭕ O: <@${game.players.O}>\n\n` +
+      result,
+    components: buildTicTacToeRows(gameId, game)
+  });
+
+  if (game.finished) {
+    ticTacToeGames.delete(gameId);
+  }
+
+  return;
+}
     // ==========================================
     // VOUCH TYPE BUTTONS
     // ==========================================
@@ -1080,13 +1256,18 @@ client.on("interactionCreate", async interaction => {
         .setMaxValues(1);
 
       return interaction.update({
-        content:
-          `**${type.toUpperCase()} VOUCH**\n` +
-          `Select the exact role you want to give <@${targetId}>.`,
-        components: [
-          new ActionRowBuilder().addComponents(roleMenu)
-        ]
-      });
+  embeds: [
+    zombEmbed(
+      `${type.toUpperCase()} VOUCH`,
+      `Select the exact role you want to give <@${targetId}>.`,
+      type === "staff" ? 0x57F287 : 0xED4245
+    )
+  ],
+  content: null,
+  components: [
+    new ActionRowBuilder().addComponents(roleMenu)
+  ]
+});
     }
 
     // ==========================================
@@ -1645,7 +1826,589 @@ client.on("messageCreate", async message => {
 
   const args = message.content.trim().split(/\s+/);
   const command = args[0].toLowerCase();
+// ==========================================
+// ZOMB HELP
+// ==========================================
 
+if (command === "~help") {
+  return message.reply({
+    embeds: [
+      zombEmbed(
+        "COMMAND CENTER",
+        "**MODERATION**\n" +
+        "`~ban @user/ID` — Permanently ban a member\n" +
+        "`~unban USER_ID` — Unban a user\n" +
+        "`~hardban @user/ID` — Ban and delete up to 7 days of messages\n" +
+        "`~foreverban @user/ID` — Permanent hard ban\n" +
+        "`~kick @user` — Kick a member\n" +
+        "`~mute @user [duration]` — Timeout a member\n" +
+        "`~timeout @user duration` — Set a timeout\n" +
+        "`~unmute @user` — Remove a timeout\n" +
+        "`~jail setup @role` — Configure the jail role\n" +
+        "`~jail @user` — Jail a member\n" +
+        "`~unjail @user` — Release a member\n\n" +
+        "**FUN**\n" +
+        "`~tictactoe @user` — Challenge someone to Tic-Tac-Toe\n" +
+        "`~ttt @user` — Shortcut for Tic-Tac-Toe\n\n" +
+        "**VOUCH SYSTEM**\n" +
+        "`~vouch @member` — Start a Staff or Admin vouch\n" +
+        "`~vouchlist` — View your vouch usage\n" +
+        "`~stripstaff` — Remove a previous vouch\n" +
+        "`~vouchreset all` — Reset all vouch records (owner only)\n\n" +
+        "**SECURITY**\n" +
+        "`~an` — Anti-Nuke help\n" +
+        "`~an status` — View security status\n" +
+        "`~an trust @user` — Trust a member\n" +
+        "`~an untrust @user` — Remove trust\n" +
+        "`~an trustlist` — View trusted members\n" +
+        "`~an enable/disable` — Configure detection\n" +
+        "`~an antibot enable/disable` — Configure Anti-Bot\n" +
+        "`~an punishment enable/disable` — Configure punishment",
+        0x5865F2
+      )
+    ]
+  });
+}
+
+// ==========================================
+// TIC TAC TOE COMMAND
+// ==========================================
+
+if (command === "~tictactoe" || command === "~ttt") {
+  const opponent = message.mentions.users.first();
+
+  if (!opponent) {
+    return message.reply("Usage: `~tictactoe @user`");
+  }
+
+  if (
+    opponent.bot ||
+    opponent.id === message.author.id
+  ) {
+    return message.reply("Choose another human member to play against.");
+  }
+
+  const gameId =
+    `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 7)}`;
+
+  const game = {
+    players: {
+      X: message.author.id,
+      O: opponent.id
+    },
+    board: Array(9).fill(null),
+    turn: "X",
+    finished: false
+  };
+
+  ticTacToeGames.set(gameId, game);
+
+  setTimeout(() => {
+    ticTacToeGames.delete(gameId);
+  }, 10 * 60 * 1000);
+
+  return message.reply({
+    content:
+      `**ZOMB TIC TAC TOE**\n\n` +
+      `❌ X: ${message.author}\n` +
+      `⭕ O: ${opponent}\n\n` +
+      `**Turn:** ${message.author} (X)`,
+    components: buildTicTacToeRows(gameId, game)
+  });
+}
+
+// ==========================================
+// MODERATION TARGET HELPER
+// ==========================================
+
+const moderationTargetId =
+  message.mentions.users.first()?.id ||
+  args[1]?.replace(/[<@!>]/g, "");
+
+const validModerationTarget =
+  /^\d{17,20}$/.test(moderationTargetId || "");
+
+// ==========================================
+// BAN / HARDBAN / FOREVERBAN
+// ==========================================
+
+if (
+  command === "~ban" ||
+  command === "~hardban" ||
+  command === "~foreverban"
+) {
+  if (
+    !message.member.permissions.has(
+      PermissionsBitField.Flags.BanMembers
+    )
+  ) {
+    return message.reply("You need the Ban Members permission.");
+  }
+
+  const botMember = message.guild.members.me;
+
+  if (
+    !botMember?.permissions.has(
+      PermissionsBitField.Flags.BanMembers
+    )
+  ) {
+    return message.reply("ZOMB needs the Ban Members permission.");
+  }
+
+  if (!validModerationTarget) {
+    return message.reply(
+      `Usage: \`${command} @user\` or \`${command} USER_ID\``
+    );
+  }
+
+  if (moderationTargetId === message.guild.ownerId) {
+    return message.reply("The server owner cannot be banned.");
+  }
+
+  if (moderationTargetId === message.author.id) {
+    return message.reply("You cannot ban yourself.");
+  }
+
+  const targetMember = await message.guild.members
+    .fetch(moderationTargetId)
+    .catch(() => null);
+
+  if (
+    targetMember &&
+    message.author.id !== message.guild.ownerId &&
+    targetMember.roles.highest.position >=
+      message.member.roles.highest.position
+  ) {
+    return message.reply("You cannot ban someone with an equal or higher role.");
+  }
+
+  if (
+    targetMember &&
+    !targetMember.bannable
+  ) {
+    return message.reply("ZOMB cannot ban that member. Check role hierarchy.");
+  }
+
+  const targetUser = await client.users
+    .fetch(moderationTargetId)
+    .catch(() => null);
+
+  if (!targetUser) {
+    return message.reply("ZOMB could not find that Discord user.");
+  }
+
+  const hardBan =
+    command === "~hardban" ||
+    command === "~foreverban";
+
+  const reason =
+    args.slice(2).join(" ") ||
+    `Action by ${message.author.tag}`;
+
+  try {
+    await message.guild.members.ban(moderationTargetId, {
+      reason: `ZOMB ${command}: ${reason}`,
+      deleteMessageSeconds: hardBan ? 604800 : 0
+    });
+
+    return message.reply({
+      embeds: [
+        zombEmbed(
+          hardBan ? "HARDBAN SUCCESSFUL" : "BAN SUCCESSFUL",
+          `**Member:** ${targetUser.tag}\n` +
+          `**User ID:** ${moderationTargetId}\n` +
+          `**Moderator:** ${message.author}\n` +
+          `**Reason:** ${reason}\n` +
+          `**Message deletion:** ${hardBan ? "Up to 7 days" : "None"}`,
+          0xED4245
+        )
+      ]
+    });
+  } catch (error) {
+    console.error("[ZOMB BAN ERROR]", error);
+    return message.reply("ZOMB could not ban that user. Check its permissions.");
+  }
+}
+
+// ==========================================
+// UNBAN
+// ==========================================
+
+if (command === "~unban") {
+  if (
+    !message.member.permissions.has(
+      PermissionsBitField.Flags.BanMembers
+    )
+  ) {
+    return message.reply("You need the Ban Members permission.");
+  }
+
+  const userId = args[1]?.replace(/[<@!>]/g, "");
+
+  if (!/^\d{17,20}$/.test(userId || "")) {
+    return message.reply("Usage: `~unban USER_ID`");
+  }
+
+  try {
+    await message.guild.members.unban(
+      userId,
+      `Unbanned by ${message.author.tag}`
+    );
+
+    return message.reply({
+      embeds: [
+        zombEmbed(
+          "UNBAN SUCCESSFUL",
+          `**User ID:** ${userId}\n**Moderator:** ${message.author}`,
+          0x57F287
+        )
+      ]
+    });
+  } catch (error) {
+    console.error("[ZOMB UNBAN ERROR]", error);
+    return message.reply("Could not unban that user. Check the ID and ZOMB's permissions.");
+  }
+}
+
+// ==========================================
+// KICK
+// ==========================================
+
+if (command === "~kick") {
+  if (
+    !message.member.permissions.has(
+      PermissionsBitField.Flags.KickMembers
+    )
+  ) {
+    return message.reply("You need the Kick Members permission.");
+  }
+
+  if (!validModerationTarget) {
+    return message.reply("Usage: `~kick @user` or `~kick USER_ID`");
+  }
+
+  const target = await message.guild.members
+    .fetch(moderationTargetId)
+    .catch(() => null);
+
+  if (!target) {
+    return message.reply("That member is not in this server.");
+  }
+
+  if (
+    message.author.id !== message.guild.ownerId &&
+    target.roles.highest.position >= message.member.roles.highest.position
+  ) {
+    return message.reply("You cannot kick someone with an equal or higher role.");
+  }
+
+  if (!target.kickable) {
+    return message.reply("ZOMB cannot kick that member. Check its permissions and role hierarchy.");
+  }
+
+  const reason = args.slice(2).join(" ") || "No reason provided.";
+
+  try {
+    await target.kick(
+      `ZOMB kick by ${message.author.tag}: ${reason}`
+    );
+
+    return message.reply({
+      embeds: [
+        zombEmbed(
+          "KICK SUCCESSFUL",
+          `**Member:** ${target.user.tag}\n` +
+          `**Moderator:** ${message.author}\n` +
+          `**Reason:** ${reason}`,
+          0xED4245
+        )
+      ]
+    });
+  } catch (error) {
+    console.error("[ZOMB KICK ERROR]", error);
+    return message.reply("ZOMB could not kick that member.");
+  }
+}
+
+// ==========================================
+// MUTE / TIMEOUT
+// ==========================================
+
+if (command === "~mute" || command === "~timeout") {
+  if (
+    !message.member.permissions.has(
+      PermissionsBitField.Flags.ModerateMembers
+    )
+  ) {
+    return message.reply("You need the Moderate Members permission.");
+  }
+
+  if (!validModerationTarget) {
+    return message.reply(
+      `Usage: \`${command} @user ${command === "~mute" ? "[10m]" : "10m"}\``
+    );
+  }
+
+  const target = await message.guild.members
+    .fetch(moderationTargetId)
+    .catch(() => null);
+
+  if (!target) {
+    return message.reply("That member is not in this server.");
+  }
+
+  if (
+    message.author.id !== message.guild.ownerId &&
+    target.roles.highest.position >= message.member.roles.highest.position
+  ) {
+    return message.reply("You cannot timeout someone with an equal or higher role.");
+  }
+
+  const durationText =
+    command === "~mute" && !parseDuration(args[2])
+      ? "10m"
+      : args[2];
+
+  const duration = parseDuration(durationText);
+
+  if (!duration) {
+    return message.reply(
+      "Invalid duration. Use seconds, minutes, hours, or days, such as `30s`, `10m`, `2h`, or `1d`. Maximum: 28 days."
+    );
+  }
+
+  if (!target.moderatable) {
+    return message.reply("ZOMB cannot timeout that member. Check its permissions and role hierarchy.");
+  }
+
+  const reasonStart =
+    command === "~mute" && durationText === "10m" && !parseDuration(args[2])
+      ? 2
+      : 3;
+
+  const reason =
+    args.slice(reasonStart).join(" ") || "No reason provided.";
+
+  try {
+    await target.timeout(
+      duration,
+      `ZOMB ${command}: ${reason}`
+    );
+
+    return message.reply({
+      embeds: [
+        zombEmbed(
+          "TIMEOUT SUCCESSFUL",
+          `**Member:** ${target.user.tag}\n` +
+          `**Duration:** ${durationText}\n` +
+          `**Moderator:** ${message.author}\n` +
+          `**Reason:** ${reason}`,
+          0xED4245
+        )
+      ]
+    });
+  } catch (error) {
+    console.error("[ZOMB TIMEOUT ERROR]", error);
+    return message.reply("ZOMB could not timeout that member.");
+  }
+}
+
+// ==========================================
+// UNMUTE
+// ==========================================
+
+if (command === "~unmute") {
+  if (
+    !message.member.permissions.has(
+      PermissionsBitField.Flags.ModerateMembers
+    )
+  ) {
+    return message.reply("You need the Moderate Members permission.");
+  }
+
+  if (!validModerationTarget) {
+    return message.reply("Usage: `~unmute @user`");
+  }
+
+  const target = await message.guild.members
+    .fetch(moderationTargetId)
+    .catch(() => null);
+
+  if (!target) {
+    return message.reply("That member is not in this server.");
+  }
+
+  if (!target.moderatable) {
+    return message.reply("ZOMB cannot remove that member's timeout.");
+  }
+
+  try {
+    await target.timeout(
+      null,
+      `Timeout removed by ${message.author.tag}`
+    );
+
+    return message.reply({
+      embeds: [
+        zombEmbed(
+          "TIMEOUT REMOVED",
+          `**Member:** ${target.user.tag}\n**Moderator:** ${message.author}`,
+          0x57F287
+        )
+      ]
+    });
+  } catch (error) {
+    console.error("[ZOMB UNMUTE ERROR]", error);
+    return message.reply("ZOMB could not remove that timeout.");
+  }
+}
+
+// ==========================================
+// JAIL SETUP / JAIL / UNJAIL
+// ==========================================
+
+if (command === "~jail" || command === "~unjail") {
+  if (
+    !message.member.permissions.has(
+      PermissionsBitField.Flags.ManageRoles
+    )
+  ) {
+    return message.reply("You need the Manage Roles permission.");
+  }
+
+  const guildId = message.guild.id;
+  const botMember = message.guild.members.me;
+
+  if (
+    !botMember?.permissions.has(
+      PermissionsBitField.Flags.ManageRoles
+    )
+  ) {
+    return message.reply("ZOMB needs the Manage Roles permission.");
+  }
+
+  if (
+    command === "~jail" &&
+    args[1]?.toLowerCase() === "setup"
+  ) {
+    const jailRole = message.mentions.roles.first();
+
+    if (!jailRole) {
+      return message.reply("Usage: `~jail setup @JailRole`");
+    }
+
+    if (
+      jailRole.managed ||
+      jailRole.position >= message.member.roles.highest.position ||
+      jailRole.position >= botMember.roles.highest.position ||
+      !jailRole.editable
+    ) {
+      return message.reply("That jail role must be below your highest role and ZOMB's highest role.");
+    }
+
+    antiNukeData.jailRoles[guildId] = jailRole.id;
+
+    if (!saveAntiNukeData()) {
+      delete antiNukeData.jailRoles[guildId];
+      return message.reply("ZOMB could not save the jail role.");
+    }
+
+    return message.reply({
+      embeds: [
+        zombEmbed(
+          "JAIL ROLE CONFIGURED",
+          `Jail role: ${jailRole}`,
+          0x57F287
+        )
+      ]
+    });
+  }
+
+  if (!validModerationTarget) {
+    return message.reply(
+      command === "~jail"
+        ? "Usage: `~jail @user`"
+        : "Usage: `~unjail @user`"
+    );
+  }
+
+  const target = await message.guild.members
+    .fetch(moderationTargetId)
+    .catch(() => null);
+
+  if (!target) {
+    return message.reply("That member is not in this server.");
+  }
+
+  if (
+    message.author.id !== message.guild.ownerId &&
+    target.roles.highest.position >= message.member.roles.highest.position
+  ) {
+    return message.reply("You cannot manage someone with an equal or higher role.");
+  }
+
+  const jailRoleId = antiNukeData.jailRoles[guildId];
+
+  if (!jailRoleId) {
+    return message.reply("No jail role is configured. Use `~jail setup @role` first.");
+  }
+
+  const jailRole = await message.guild.roles
+    .fetch(jailRoleId)
+    .catch(() => null);
+
+  if (!jailRole || !jailRole.editable) {
+    return message.reply("The configured jail role is missing or cannot be managed by ZOMB.");
+  }
+
+  try {
+    if (command === "~jail") {
+      if (target.roles.cache.has(jailRole.id)) {
+        return message.reply("That member is already jailed.");
+      }
+
+      await target.roles.add(
+        jailRole,
+        `Jailed by ${message.author.tag}`
+      );
+
+      return message.reply({
+        embeds: [
+          zombEmbed(
+            "MEMBER JAILED",
+            `**Member:** ${target.user.tag}\n` +
+            `**Jail role:** ${jailRole}\n` +
+            `**Moderator:** ${message.author}`,
+            0xED4245
+          )
+        ]
+      });
+    }
+
+    if (!target.roles.cache.has(jailRole.id)) {
+      return message.reply("That member does not have the jail role.");
+    }
+
+    await target.roles.remove(
+      jailRole,
+      `Released by ${message.author.tag}`
+    );
+
+    return message.reply({
+      embeds: [
+        zombEmbed(
+          "MEMBER RELEASED",
+          `**Member:** ${target.user.tag}\n` +
+          `**Moderator:** ${message.author}`,
+          0x57F287
+        )
+      ]
+    });
+  } catch (error) {
+    console.error("[ZOMB JAIL ERROR]", error);
+    return message.reply("ZOMB could not change that member's jail role.");
+  }
+}
   // ==========================================
   // ZOMB CHANNEL NUKE
   // ==========================================
@@ -1801,7 +2564,7 @@ client.on("messageCreate", async message => {
           `zomb_vouch_type|${guildId}|${message.author.id}|${targetUser.id}|staff`
         )
         .setLabel("Staff")
-        .setStyle(ButtonStyle.Primary),
+       .setStyle(ButtonStyle.Success),
 
       new ButtonBuilder()
         .setCustomId(
