@@ -1424,9 +1424,22 @@ client.on("messageCreate", async message => {
 
   const targetUser = message.mentions.users.first();
 
-  if (!targetUser) {
-    return message.reply("Usage: `~vouch @member`");
-  }
+ if (!targetUser) {
+  return message.reply(
+    "**🛡️ ZOMB VOUCH COMMANDS**\n\n" +
+    "`~vouch @member` — Start a Staff or Admin vouch.\n" +
+    "`~vouchlist` — View your Staff and Admin vouch usage.\n" +
+    "`~stripstaff` — Remove a previous vouch and its assigned role.\n\n" +
+    "**VOUCH LIMITS**\n" +
+    "• Staff: 3 vouches\n" +
+    "• Admin: 2 vouches\n\n" +
+    "**HOW IT WORKS**\n" +
+    "1. Mention the member using `~vouch @member`.\n" +
+    "2. Select Staff or Admin.\n" +
+    "3. Select the role you want to give.\n" +
+    "4. ZOMB assigns the role and records your vouch."
+  );
+}
 
   if (
     targetUser.bot ||
