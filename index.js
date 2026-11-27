@@ -1365,7 +1365,7 @@ if (
   }
 
   const action = (args[1] || "").toLowerCase();
-  const guildId = message.guild.id;
+  
 
   // ==========================================
   // ANTI-BOT SETTINGS
