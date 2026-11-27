@@ -571,8 +571,11 @@ async function punishAttacker(
     executorId === client.user.id
   ) return;
 
-  const trusted = antiNukeData.trusted[guild.id] || [];
-  if (trusted.includes(executorId)) return;
+ const trusted = antiNukeData.trusted[guild.id] || [];
+if (trusted.includes(executorId)) return;
+
+const whitelist = antiNukeData.whitelist[guild.id] || [];
+if (whitelist.includes(executorId)) return;
 
   const member = await guild.members
     .fetch(executorId)
@@ -686,8 +689,11 @@ async function processAuditEntries(
         entry.executor.bot
       ) continue;
 
-      const trusted = antiNukeData.trusted[guild.id] || [];
-      if (trusted.includes(executorId)) continue;
+     const trusted = antiNukeData.trusted[guild.id] || [];
+if (trusted.includes(executorId)) continue;
+
+const whitelist = antiNukeData.whitelist[guild.id] || [];
+if (whitelist.includes(executorId)) continue;
 
       const limit = ANTI_NUKE_LIMITS[actionName];
       if (!limit) continue;
