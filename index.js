@@ -34,6 +34,34 @@ const VOUCH_ROLE_IDS = {
 const DATA_FILE = process.env.ANTINUKE_FILE ||
   path.join("/data", "antinuke.json");
 
+// ==========================================
+// ZOMB ALIAS STORAGE
+// ==========================================
+
+const ALIASES_FILE = process.env.ALIASES_FILE ||
+  path.join("/data", "aliases.json");
+
+function loadAliases() {
+  try {
+    return JSON.parse(fs.readFileSync(ALIASES_FILE, "utf8"));
+  } catch {
+    return {};
+  }
+}
+
+let aliases = loadAliases();
+
+function saveAliases() {
+  fs.mkdirSync(path.dirname(ALIASES_FILE), {
+    recursive: true
+  });
+
+  fs.writeFileSync(
+    ALIASES_FILE,
+    JSON.stringify(aliases, null, 2)
+  );
+}
+
 const LOG_CHANNEL_ID = "1575507474709090446";
 const AUDIT_LOOKBACK_MS = 15000;
 
@@ -1921,8 +1949,124 @@ client.on("messageCreate", async message => {
 
   if (!message.guild || message.author.bot) return;
 
-  const args = message.content.trim().split(/\s+/);
-  const command = args[0].toLowerCase();
+  
+let args = message.content.trim().split(/\s+/);
+let command = args[0].toLowerCase();
+
+// ==========================================
+// ZOMB ALIAS SYSTEM
+// ==========================================
+
+if (command === "~alias") {
+  if (!message.member.permissions.has(
+    PermissionsBitField.Flags.Administrator
+  )) {
+    return message.reply("You need Administrator permission to manage aliases.");
+  }
+
+  const action = (args[1] || "").toLowerCase();
+  const guildId = message.guild.id;
+
+  if (!aliases[guildId]) {
+    aliases[guildId] = {};
+  }
+
+  // ADD ALIAS
+  if (action === "add") {
+    const aliasName = (args[2] || "")
+      .toLowerCase()
+      .replace(/^~/, "");
+
+    const template = args.slice(3).join(" ").trim();
+
+    if (!aliasName || !template) {
+      return message.reply(
+        "Usage: `~alias add alias command {0}`"
+      );
+    }
+
+    if (aliasName === "alias") {
+      return message.reply("You cannot use alias as an alias name.");
+    }
+
+    if (aliases[guildId][aliasName]) {
+      return message.reply("That alias already exists. Remove it first.");
+    }
+
+    aliases[guildId][aliasName] = template.replace(/^~/, "");
+
+    saveAliases();
+
+    return message.reply(
+      `Alias **~${aliasName}** has been created!\nCommand: \`~${aliases[guildId][aliasName]}\``
+    );
+  }
+
+  // REMOVE ALIAS
+  if (action === "remove") {
+    const aliasName = (args[2] || "")
+      .toLowerCase()
+      .replace(/^~/, "");
+
+    if (!aliases[guildId][aliasName]) {
+      return message.reply("That alias doesn't exist.");
+    }
+
+    delete aliases[guildId][aliasName];
+    saveAliases();
+
+    return message.reply(`Alias **~${aliasName}** has been removed.`);
+  }
+
+  // LIST ALIASES
+  if (action === "list") {
+    const entries = Object.entries(aliases[guildId]);
+
+    if (!entries.length) {
+      return message.reply("There are no aliases registered.");
+    }
+
+    const embed = new EmbedBuilder()
+      .setColor(0x2b2d31)
+      .setTitle("ZOMB ALIASES")
+      .setDescription(
+        entries.map(([name, template]) =>
+          `**~${name}** → \`~${template}\``
+        ).join("\n")
+      )
+      .setFooter({ text: `Total aliases: ${entries.length}` });
+
+    return message.reply({ embeds: [embed] });
+  }
+
+  return message.reply(
+    "Usage: `~alias add`, `~alias remove`, or `~alias list`"
+  );
+}
+
+// ==========================================
+// ALIAS EXECUTION
+// ==========================================
+
+const aliasName = command.replace(/^~/, "");
+const aliasTemplate = aliases[message.guild.id]?.[aliasName];
+
+if (aliasTemplate) {
+  const originalArguments = args.slice(1);
+
+  const expandedCommand = aliasTemplate.replace(
+    /\{(\d+)\}/g,
+    (_, index) => originalArguments[Number(index)] || ""
+  );
+
+  const cleanCommand = expandedCommand.trim();
+
+  if (!cleanCommand) return;
+
+  args = [`~${cleanCommand}`].join(" ").split(/\s+/);
+  command = args[0].toLowerCase();
+}
+
   
 
 
