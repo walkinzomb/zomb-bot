@@ -1945,9 +1945,9 @@ if (
       message.mentions.roles.first()?.id ||
       args.slice(1).join(" ").trim();
 
-    await message.guild.roles.fetch();
+  await message.guild.roles.fetch();
 
-    const matches = message.guild.roles.cache.filter(
+const matches = message.guild.roles.cache.filter(
   r =>
     r.id === roleInput ||
     r.name.toLowerCase().includes(roleInput.toLowerCase())
