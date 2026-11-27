@@ -1979,55 +1979,34 @@ if (
     message.mentions.users.first()?.id ||
     args[1]?.replace(/[<@!>]/g, "");
 
-  const roleInput =
-    message.mentions.roles.first()?.id ||
-    args.slice(2).join(" ").trim();
+  const roleSearch = roleInput
+  .toLowerCase()
+  .replace(/[‘’]/g, "'")
+  .trim();
 
-  if (!targetId || !roleInput || !/^\d{17,20}$/.test(targetId)) {
-    return message.reply(
-      "Usage: `~r @user Role Name` or `~r USER_ID ROLE_ID`"
-    );
-  }
+const matches = message.guild.roles.cache.filter(r => {
+  const name = r.name
+    .toLowerCase()
+    .replace(/[‘’]/g, "'")
+    .trim();
 
-  const targetMember = await message.guild.members
-    .fetch(targetId)
-    .catch(() => null);
-
-  if (!targetMember) {
-    return message.reply("I couldn't find that member in this server.");
-  }
-
-  await message.guild.roles.fetch();
-
-  const role = message.guild.roles.cache.find(
-    r =>
-      r.id === roleInput ||
-      r.name.toLowerCase() === roleInput.toLowerCase()
+  return (
+    r.id === roleInput ||
+    name.includes(roleSearch)
   );
+});
 
-  if (!role) {
-    return message.reply("I couldn't find that role in this server.");
-  }
-
-  if (role.id === message.guild.id || role.managed) {
-    return message.reply("That role cannot be manually assigned or removed.");
-  }
-
-  const botMember = await message.guild.members.fetchMe();
-
-  if (role.position >= botMember.roles.highest.position) {
-    return message.reply("That role is above or equal to ZOMB's highest role.");
-  }
-
-  if (targetMember.roles.cache.has(role.id)) {
-    await targetMember.roles.remove(role);
-    return message.reply(`${role} has been removed from ${targetMember}.`);
-  }
-
-  await targetMember.roles.add(role);
-  return message.reply(`${role} has been added to ${targetMember}.`);
+if (matches.size === 0) {
+  return message.reply("I couldn't find that role in this server.");
 }
 
+if (matches.size > 1) {
+  return message.reply(
+    `Multiple roles match "${roleInput}": ${matches.map(r => r.name).join(", ")}`
+  );
+}
+
+const role = matches.first();
 
 // ==========================================
 // ZOMB SNIPE COMMANDS
