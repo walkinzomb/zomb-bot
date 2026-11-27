@@ -1307,6 +1307,7 @@ return interaction.update({
     new ActionRowBuilder().addComponents(roleMenu)
   ]
 });
+}
     // ==========================================
     // VOUCH ROLE PICKER
     // ==========================================
