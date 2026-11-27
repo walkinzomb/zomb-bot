@@ -1940,15 +1940,21 @@ if (
 
   // ROLE INFO COMMANDS
   if (command === "~ir" || command === "~roleinfo") {
-    const roleId =
-      message.mentions.roles.first()?.id ||
-      args.find(arg => /^\d{17,20}$/.test(arg));
+ const roleInput =
+  message.mentions.roles.first()?.id ||
+  args.slice(2).join(" ").trim();
 
     if (!roleId) {
       return message.reply("Usage: `~ir @role` or `~ir ROLE_ID`");
     }
 
-    const role = await message.guild.roles.fetch(roleId).catch(() => null);
+  await message.guild.roles.fetch();
+
+const role = message.guild.roles.cache.find(
+  r =>
+    r.id === roleInput ||
+    r.name.toLowerCase() === roleInput.toLowerCase()
+);
 
     if (!role) {
       return message.reply("I couldn't find that role in this server.");
