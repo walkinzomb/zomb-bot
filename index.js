@@ -84,8 +84,8 @@ function loadAntiNukeData() {
         logs: saved.logs || {},
         punishment: saved.punishment || {},
         antiBot: saved.antiBot || {},
-        vouches: saved.vouches || {}
-        vouchRoles: saved.vouchRoles || {}
+       vouches: saved.vouches || {},
+vouchRoles: saved.vouchRoles || {}
       };
     }
 
