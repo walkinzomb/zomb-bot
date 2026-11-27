@@ -1982,8 +1982,8 @@ let command = args[0].toLowerCase();
 // ZOMB AFK SYSTEM
 // ==========================================
 
-const guildId = message.guild.id;
-const userId = message.author.id;
+const afkGuildId = message.guild.id;
+const afkUserId = message.author.id;
 
 // SET AFK
 if (command === "~afk") {
