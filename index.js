@@ -1050,10 +1050,7 @@ client.on("messageCreate", async message => {
         throw error;
       }
 
-      await newChannel.send(
-        "💣 **CHANNEL NUKE COMPLETE**\n" +
-        "This channel has been freshly restarted by ZOMB."
-      );
+      await newChannel.send("first");
 
     } catch (error) {
       console.error("[ZOMB NUKE ERROR]", error);
