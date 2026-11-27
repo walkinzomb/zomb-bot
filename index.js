@@ -1827,6 +1827,7 @@ client.on("messageCreate", async message => {
   const args = message.content.trim().split(/\s+/);
   const command = args[0].toLowerCase();
   if (command === "~tictactoe" || command === "~ttt") {
+    console.log("[ZOMB COMMAND]", message.content);
   console.log("ZOMB DETECTED TIC TAC TOE COMMAND");
 }
 // ==========================================
