@@ -1160,11 +1160,10 @@ client.on("messageCreate", async message => {
 
     if (!targetUser || !["staff", "admin"].includes(type)) {
       return message.reply(
-        "**VOUCH USAGE**\n" +
-        "`~vouch @member staff`\n" +
-        "`~vouch @member admin`"
-      );
-    }
+  "**VOUCH USAGE**\n" +
+  "`~vouch @member staff @StaffRole`\n" +
+  "`~vouch @member admin @AdminRole`"
+);
 
     if (
       targetUser.bot ||
@@ -1233,11 +1232,46 @@ client.on("messageCreate", async message => {
       );
     }
 
-    const role = findVouchRole(
-      message.guild,
-      voucherMember,
-      type
-    );
+   const role = message.mentions.roles.first();
+
+if (!role) {
+  return message.reply(
+    "❌ You must mention the Staff or Admin role you want to assign."
+  );
+}
+
+const isAdminRole = role.permissions.has(
+  PermissionsBitField.Flags.Administrator
+);
+
+const isStaffRole =
+  !isAdminRole &&
+  role.permissions.has(PermissionsBitField.Flags.ManageRoles) &&
+  STAFF_EXTRA_PERMISSIONS.some(permission =>
+    role.permissions.has(permission)
+  );
+
+if (type === "admin" && !isAdminRole) {
+  return message.reply(
+    "❌ That role does not have Administrator permission."
+  );
+}
+
+if (type === "staff" && !isStaffRole) {
+  return message.reply(
+    "❌ That role does not qualify as Staff."
+  );
+}
+
+if (
+  role.position >= voucherMember.roles.highest.position ||
+  role.position >= message.guild.members.me.roles.highest.position ||
+  !role.editable
+) {
+  return message.reply(
+    "❌ That role is too high for you or ZOMB to assign."
+  );
+}
 
     if (!role) {
       return message.reply(
