@@ -105,44 +105,54 @@ let antiNukeData = {
   vouches: {},
   vouchRoles: {},
   jailRoles: {}
+  jailChannels: {},
+  
 };
 
 function loadAntiNukeData() {
   try {
-    const legacyFile = path.join(__dirname, "antinuke.json");
-    let saved;
-
-    if (fs.existsSync(DATA_FILE)) {
-      saved = JSON.parse(fs.readFileSync(DATA_FILE, "utf8"));
-    } else if (fs.existsSync(legacyFile)) {
-      saved = JSON.parse(fs.readFileSync(legacyFile, "utf8"));
-    }
-
-    if (saved) {
-      antiNukeData = {
-        trusted: saved.trusted || {},
-        enabled: saved.enabled || {},
-        logs: saved.logs || {},
-        punishment: saved.punishment || {},
-        antiBot: saved.antiBot || {},
-        vouches: saved.vouches || {},
-        vouchRoles: saved.vouchRoles || {},
-        jailRoles: saved.jailRoles || {}
+    if (!fs.existsSync(DATA_FILE)) {
+      return {
+        trusted: {},
+        enabled: {},
+        logs: {},
+        punishment: {},
+        antiBot: {},
+        vouches: {},
+        vouchRoles: {},
+        jailRoles: {},
+        jailChannels: {}
       };
     }
 
-    fs.mkdirSync(path.dirname(DATA_FILE), {
-      recursive: true
-    });
+    const saved = JSON.parse(fs.readFileSync(DATA_FILE, "utf8"));
 
-    fs.writeFileSync(
-      DATA_FILE,
-      JSON.stringify(antiNukeData, null, 2)
-    );
+    return {
+      trusted: saved.trusted || {},
+      enabled: saved.enabled || {},
+      logs: saved.logs || {},
+      punishment: saved.punishment || {},
+      antiBot: saved.antiBot || {},
+      vouches: saved.vouches || {},
+      vouchRoles: saved.vouchRoles || {},
+      jailRoles: saved.jailRoles || {},
+      jailChannels: saved.jailChannels || {}
+    };
 
-    console.log("[ZOMB] Data loaded from persistent storage.");
   } catch (error) {
-    console.error("[ZOMB DATA ERROR]", error);
+    console.error("[ZOMB] Failed to load anti-nuke data:", error);
+
+    return {
+      trusted: {},
+      enabled: {},
+      logs: {},
+      punishment: {},
+      antiBot: {},
+      vouches: {},
+      vouchRoles: {},
+      jailRoles: {},
+      jailChannels: {}
+    };
   }
 }
 
