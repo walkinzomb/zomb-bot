@@ -1999,7 +1999,7 @@ if (command === "~afk") {
   saveAfk();
 
   return message.reply(
-    `💤 **You are now AFK:** ${reason}`
+    ` **You are now afk:** ${reason}`
   );
 }
 
@@ -2041,7 +2041,7 @@ if (returningAfk) {
   saveAfk();
 
   message.reply(
-    `👋 **Welcome back, ${message.author.username}!** You were away for **${duration}**.`
+    ` **hello, ${message.author.username}!** You were away for **${duration}**.`
   );
 }
 // ==========================================
