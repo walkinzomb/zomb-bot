@@ -2937,6 +2937,7 @@ if (command === "~jail" || command === "~unjail") {
   // ZOMB VOUCH LIST
   // ==========================================
 
+ 
   if (command === "~vouchlist") {
     const guildId = message.guild.id;
 
@@ -2944,22 +2945,47 @@ if (command === "~jail" || command === "~unjail") {
       return message.reply("Only trusted members can view their vouch usage.");
     }
 
-    const voucherData = getVoucherData(
-      guildId,
-      message.author.id
-    );
+    const voucherData = getVoucherData(guildId, message.author.id);
 
     const staffUsed = voucherData.staff.length;
     const adminUsed = voucherData.admin.length;
 
-    return message.reply(
-      `**VOUCH USAGE**\n\n` +
-      `**Staff:** ${staffUsed}/${VOUCH_LIMITS.staff}\n` +
-      `**Staff remaining:** ${VOUCH_LIMITS.staff - staffUsed}\n\n` +
-      `**Admin:** ${adminUsed}/${VOUCH_LIMITS.admin}\n` +
-      `**Admin remaining:** ${VOUCH_LIMITS.admin - adminUsed}`
-    );
+    const allVouches = antiNukeData.vouches[guildId] || {};
+    const vouchedMembers = new Set();
+    const vouchLines = [];
+
+    for (const [voucherId, data] of Object.entries(allVouches)) {
+      for (const targetId of (data.staff || [])) {
+        vouchedMembers.add(targetId);
+        vouchLines.push(`• <@${targetId}> — **STAFF** (vouched by <@${voucherId}>)`);
+      }
+
+      for (const targetId of (data.admin || [])) {
+        vouchedMembers.add(targetId);
+        vouchLines.push(`• <@${targetId}> — **ADMIN** (vouched by <@${voucherId}>)`);
+      }
+    }
+
+    const vouchList = vouchLines.length
+      ? vouchLines.join("\n").slice(0, 3500)
+      : "No members have been vouched yet.";
+
+    const embed = new EmbedBuilder()
+      .setColor(0x2b2d31)
+      .setTitle("ZOMB VOUCH LIST")
+      .setDescription(
+        `**YOUR VOUCH USAGE**\n` +
+        `Staff: ${staffUsed}/${VOUCH_LIMITS.staff} (${VOUCH_LIMITS.staff - staffUsed} remaining)\n` +
+        `Admin: ${adminUsed}/${VOUCH_LIMITS.admin} (${VOUCH_LIMITS.admin - adminUsed} remaining)\n\n` +
+        `**SERVER VOUCHES**\n${vouchList}`
+      )
+      .setFooter({
+        text: `TOTAL VOUCHED MEMBERS: ${vouchedMembers.size}`
+      });
+
+    return message.reply({ embeds: [embed] });
   }
+
 
   // ==========================================
   // ZOMB STRIPSTAFF COMMAND
