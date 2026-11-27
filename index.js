@@ -1043,6 +1043,7 @@ function getTicTacToeWinner(board) {
   return null;
 }
 
+
 function buildTicTacToeRows(gameId, game) {
   const rows = [];
 
@@ -1056,7 +1057,7 @@ function buildTicTacToeRows(gameId, game) {
       buttons.push(
         new ButtonBuilder()
           .setCustomId(`zomb_ttt|${gameId}|${index}`)
-          .setLabel(mark || " ")
+          .setLabel(mark || "・")
           .setStyle(
             mark === "X"
               ? ButtonStyle.Primary
@@ -1075,6 +1076,7 @@ function buildTicTacToeRows(gameId, game) {
 
   return rows;
 }
+
 // ==========================================
 // SLASH COMMAND REGISTRATION
 // ==========================================
