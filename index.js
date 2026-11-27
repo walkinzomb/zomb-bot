@@ -1925,6 +1925,7 @@ client.on("messageCreate", async message => {
   const command = args[0].toLowerCase();
   
 
+
 // ==========================================
 // ZOMB ROLE COMMANDS
 // ==========================================
@@ -1939,78 +1940,115 @@ if (
     return message.reply("You need Manage Roles permission to use this command.");
   }
 
-  // ROLE INFO
-  if (command === "~ir" || command === "~roleinfo") {
-  const roleInput =
-    message.mentions.roles.first()?.id ||
-    args.slice(1).join(" ").trim();
-
   await message.guild.roles.fetch();
 
-  const role = message.guild.roles.cache.find(
-    r =>
-      r.id === roleInput ||
-      r.name.toLowerCase() === roleInput.toLowerCase()
-  );
+  // ROLE INFO
+  if (command === "~ir" || command === "~roleinfo") {
+    const roleInput =
+      message.mentions.roles.first()?.id ||
+      args.slice(1).join(" ").trim();
 
-  if (!role) {
-    return message.reply("I couldn't find that role in this server.");
-  }
-
-  const embed = new EmbedBuilder()
-    .setColor(role.color || 0x2b2d31)
-    .setTitle("ROLE INFORMATION")
-    .addFields(
-      { name: "Role", value: `${role}`, inline: true },
-      { name: "Role ID", value: `\`${role.id}\``, inline: true },
-      { name: "Members", value: `${role.members.size}`, inline: true },
-      { name: "Color", value: role.hexColor, inline: true },
-      { name: "Position", value: `${role.position}`, inline: true },
-      { name: "Mentionable", value: role.mentionable ? "Yes" : "No", inline: true },
-      { name: "Hoisted", value: role.hoist ? "Yes" : "No", inline: true },
-      { name: "Managed", value: role.managed ? "Yes" : "No", inline: true }
+    const role = message.guild.roles.cache.find(
+      r =>
+        r.id === roleInput ||
+        r.name.toLowerCase() === roleInput.toLowerCase()
     );
 
-  return message.reply({ embeds: [embed] });
-}
+    if (!role) {
+      return message.reply("I couldn't find that role in this server.");
+    }
+
+    const embed = new EmbedBuilder()
+      .setColor(role.color || 0x2b2d31)
+      .setTitle("ROLE INFORMATION")
+      .addFields(
+        { name: "Role", value: `${role}`, inline: true },
+        { name: "Role ID", value: `\`${role.id}\``, inline: true },
+        { name: "Members", value: `${role.members.size}`, inline: true },
+        { name: "Color", value: role.hexColor, inline: true },
+        { name: "Position", value: `${role.position}`, inline: true },
+        { name: "Mentionable", value: role.mentionable ? "Yes" : "No", inline: true },
+        { name: "Hoisted", value: role.hoist ? "Yes" : "No", inline: true },
+        { name: "Managed", value: role.managed ? "Yes" : "No", inline: true }
+      );
+
+    return message.reply({ embeds: [embed] });
+  }
 
   // ROLE TOGGLE
   const targetId =
     message.mentions.users.first()?.id ||
     args[1]?.replace(/[<@!>]/g, "");
 
-  const roleSearch = roleInput
-  .toLowerCase()
-  .replace(/[‘’]/g, "'")
-  .trim();
+  const roleInput =
+    message.mentions.roles.first()?.id ||
+    args.slice(2).join(" ").trim();
 
-const matches = message.guild.roles.cache.filter(r => {
-  const name = r.name
+  if (!targetId || !roleInput) {
+    return message.reply("Usage: `~r @user Role Name`");
+  }
+
+  const targetMember = await message.guild.members
+    .fetch(targetId)
+    .catch(() => null);
+
+  if (!targetMember) {
+    return message.reply("I couldn't find that member in this server.");
+  }
+
+  const roleSearch = roleInput
     .toLowerCase()
     .replace(/[‘’]/g, "'")
     .trim();
 
-  return (
-    r.id === roleInput ||
-    name.includes(roleSearch)
-  );
-});
+  const matches = message.guild.roles.cache.filter(r => {
+    const name = r.name
+      .toLowerCase()
+      .replace(/[‘’]/g, "'")
+      .trim();
 
-if (matches.size === 0) {
-  return message.reply("I couldn't find that role in this server.");
+    return r.id === roleInput || name.includes(roleSearch);
+  });
+
+  if (matches.size === 0) {
+    return message.reply("I couldn't find that role in this server.");
+  }
+
+  if (matches.size > 1) {
+    return message.reply(
+      `Multiple roles match "${roleInput}": ${matches.map(r => r.name).join(", ")}`
+    );
+  }
+
+  const role = matches.first();
+
+  if (role.id === message.guild.id || role.managed) {
+    return message.reply("That role cannot be manually assigned or removed.");
+  }
+
+  if (role.position >= message.member.roles.highest.position) {
+    return message.reply("You cannot manage a role equal to or above your highest role.");
+  }
+
+  const botMember = await message.guild.members.fetchMe();
+
+  if (role.position >= botMember.roles.highest.position) {
+    return message.reply("That role is above or equal to ZOMB's highest role.");
+  }
+
+  if (targetMember.roles.cache.has(role.id)) {
+    await targetMember.roles.remove(role);
+    return message.reply(`${role} has been removed from ${targetMember}.`);
+  }
+
+  await targetMember.roles.add(role);
+  return message.reply(`${role} has been added to ${targetMember}.`);
 }
-
-if (matches.size > 1) {
-  return message.reply(
-    `Multiple roles match "${roleInput}": ${matches.map(r => r.name).join(", ")}`
-  );
-}
-
-const role = matches.first();
 
 // ==========================================
 // ZOMB SNIPE COMMANDS
 // ==========================================
+
 
 if (command === "~snipe" || command === "~s" || command === "~cs") {
 
