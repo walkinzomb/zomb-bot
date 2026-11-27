@@ -2044,7 +2044,61 @@ if (
   await targetMember.roles.add(role);
   return message.reply(`${role} has been added to ${targetMember}.`);
 }
+// ==========================================
+// ZOMB INROLE COMMAND
+// ==========================================
 
+if (command === "~inrole") {
+  const roleInput = args.slice(1).join(" ").trim();
+
+  if (!roleInput) {
+    return message.reply("Usage: `~inrole Role Name`");
+  }
+
+  await message.guild.roles.fetch();
+
+  const roleSearch = roleInput
+    .toLowerCase()
+    .replace(/[‘’]/g, "'")
+    .trim();
+
+  const matches = message.guild.roles.cache.filter(r => {
+    const name = r.name
+      .toLowerCase()
+      .replace(/[‘’]/g, "'")
+      .trim();
+
+    return r.id === roleInput || name.includes(roleSearch);
+  });
+
+  if (matches.size === 0) {
+    return message.reply("I couldn't find that role in this server.");
+  }
+
+  if (matches.size > 1) {
+    return message.reply(
+      `Multiple roles match "${roleInput}": ${matches.map(r => r.name).join(", ")}`
+    );
+  }
+
+  const role = matches.first();
+
+  await message.guild.members.fetch();
+
+  const members = role.members.map(member => member.user.tag);
+
+  const embed = new EmbedBuilder()
+    .setColor(role.color || 0x2b2d31)
+    .setTitle(`MEMBERS IN ${role.name}`)
+    .setDescription(
+      members.length
+        ? members.map((name, i) => `**${i + 1}.** ${name}`).join("\n")
+        : "Nobody currently has this role."
+    )
+    .setFooter({ text: `Total members: ${members.length}` });
+
+  return message.reply({ embeds: [embed] });
+}
 // ==========================================
 // ZOMB SNIPE COMMANDS
 // ==========================================
