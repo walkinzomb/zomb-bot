@@ -9,7 +9,12 @@ const {
   SlashCommandBuilder,
   EmbedBuilder,
   AuditLogEvent,
-  PermissionsBitField
+  PermissionsBitField,
+  ActionRowBuilder,
+  ButtonBuilder,
+  ButtonStyle,
+  RoleSelectMenuBuilder,
+  StringSelectMenuBuilder
 } = require("discord.js");
 
 // ==========================================
@@ -57,7 +62,8 @@ let antiNukeData = {
   logs: {},
   punishment: {},
   antiBot: {},
-  vouches: {}
+  vouches: {},
+  vouchRoles: {}
 };
 
 function loadAntiNukeData() {
@@ -79,6 +85,7 @@ function loadAntiNukeData() {
         punishment: saved.punishment || {},
         antiBot: saved.antiBot || {},
         vouches: saved.vouches || {}
+        vouchRoles: saved.vouchRoles || {}
       };
     }
 
@@ -925,8 +932,331 @@ async function registerCommands() {
 // ==========================================
 
 client.on("interactionCreate", async interaction => {
-  if (!interaction.isChatInputCommand()) return;
+  // ==========================================
+// ZOMB VOUCH BUTTONS AND ROLE PICKER
+// ==========================================
 
+if (interaction.isButton() && interaction.customId.startsWith("zomb_vouch_type|")) {
+  const parts = interaction.customId.split("|");
+  const [, guildId, voucherId, targetId, type] = parts;
+
+  if (interaction.user.id !== voucherId || interaction.guildId !== guildId) {
+    return interaction.reply({
+      content: "❌ This vouch menu belongs to someone else.",
+      ephemeral: true
+    });
+  }
+
+  const trusted = antiNukeData.trusted[guildId] || [];
+
+  if (
+    interaction.user.id !== interaction.guild.ownerId &&
+    !trusted.includes(interaction.user.id)
+  ) {
+    return interaction.reply({
+      content: "❌ You are no longer trusted.",
+      ephemeral: true
+    });
+  }
+
+  const voucherData =
+    antiNukeData.vouches?.[guildId]?.[voucherId] || {
+      staff: [],
+      admin: []
+    };
+
+  const limit = VOUCH_LIMITS[type];
+
+  if (
+    !limit ||
+    voucherData[type]?.includes(targetId) ||
+    (voucherData[type]?.length || 0) >= limit
+  ) {
+    return interaction.reply({
+      content: "❌ You have already vouched for this member or used your limit.",
+      ephemeral: true
+    });
+  }
+
+  const roleMenu = new RoleSelectMenuBuilder()
+    .setCustomId(`zomb_vouch_role|${guildId}|${voucherId}|${targetId}|${type}`)
+    .setPlaceholder(`Choose the ${type} role to assign`)
+    .setMinValues(1)
+    .setMaxValues(1);
+
+  return interaction.update({
+    content:
+      `**ZOMB ${type.toUpperCase()} VOUCH**\n` +
+      `Select the exact role you want to give <@${targetId}>.`,
+    components: [
+      new ActionRowBuilder().addComponents(roleMenu)
+    ]
+  });
+}
+
+if (interaction.isRoleSelectMenu() && interaction.customId.startsWith("zomb_vouch_role|")) {
+  const parts = interaction.customId.split("|");
+  const [, guildId, voucherId, targetId, type] = parts;
+
+  if (interaction.user.id !== voucherId || interaction.guildId !== guildId) {
+    return interaction.reply({
+      content: "❌ This role picker belongs to someone else.",
+      ephemeral: true
+    });
+  }
+
+  const trusted = antiNukeData.trusted[guildId] || [];
+
+  if (
+    interaction.user.id !== interaction.guild.ownerId &&
+    !trusted.includes(interaction.user.id)
+  ) {
+    return interaction.reply({
+      content: "❌ You are no longer trusted.",
+      ephemeral: true
+    });
+  }
+
+  const guild = interaction.guild;
+
+  const voucherMember = await guild.members
+    .fetch(voucherId)
+    .catch(() => null);
+
+  const targetMember = await guild.members
+    .fetch(targetId)
+    .catch(() => null);
+
+  const role = await guild.roles
+    .fetch(interaction.values[0])
+    .catch(() => null);
+
+  if (!voucherMember || !targetMember || !role) {
+    return interaction.update({
+      content: "❌ Could not find the member or selected role.",
+      components: []
+    });
+  }
+
+  const voucherData =
+    antiNukeData.vouches[guildId][voucherId];
+
+  const used = voucherData[type]?.length || 0;
+  const limit = VOUCH_LIMITS[type];
+
+  if (
+    voucherData[type].includes(targetId) ||
+    used >= limit
+  ) {
+    return interaction.update({
+      content: "❌ This vouch was already used or your limit is reached.",
+      components: []
+    });
+  }
+
+  const isAdminRole = role.permissions.has(
+    PermissionsBitField.Flags.Administrator
+  );
+
+  const isStaffRole =
+    !isAdminRole &&
+    role.permissions.has(PermissionsBitField.Flags.ManageRoles) &&
+    STAFF_EXTRA_PERMISSIONS.some(permission =>
+      role.permissions.has(permission)
+    );
+
+  if (type === "admin" && !isAdminRole) {
+    return interaction.update({
+      content: "❌ That role does not have Administrator permission.",
+      components: []
+    });
+  }
+
+  if (type === "staff" && !isStaffRole) {
+    return interaction.update({
+      content: "❌ That role does not qualify as Staff.",
+      components: []
+    });
+  }
+
+  const botMember = guild.members.me;
+
+  if (
+    !botMember ||
+    !botMember.permissions.has(PermissionsBitField.Flags.ManageRoles) ||
+    role.position >= voucherMember.roles.highest.position ||
+    role.position >= botMember.roles.highest.position ||
+    !role.editable
+  ) {
+    return interaction.update({
+      content: "❌ That role is too high for you or ZOMB to assign, or ZOMB lacks Manage Roles.",
+      components: []
+    });
+  }
+
+  if (targetMember.roles.cache.has(role.id)) {
+    return interaction.update({
+      content: "⚠️ That member already has this role. No vouch was used.",
+      components: []
+    });
+  }
+
+  try {
+    await targetMember.roles.add(
+      role,
+      `ZOMB ${type} vouch by ${interaction.user.tag}`
+    );
+
+    const refreshedMember = await guild.members.fetch(targetId);
+
+    if (!refreshedMember.roles.cache.has(role.id)) {
+      throw new Error("Role assignment could not be verified.");
+    }
+
+    voucherData[type].push(targetId);
+
+    antiNukeData.vouchRoles[guildId] ??= {};
+    antiNukeData.vouchRoles[guildId][voucherId] ??= {
+      staff: {},
+      admin: {}
+    };
+
+    antiNukeData.vouchRoles[guildId][voucherId][type] ??= {};
+    antiNukeData.vouchRoles[guildId][voucherId][type][targetId] = role.id;
+
+    saveAntiNukeData();
+
+    const remaining = limit - voucherData[type].length;
+
+    return interaction.update({
+      content:
+        `✅ **VOUCH SUCCESSFUL**\n\n` +
+        `**Voucher:** <@${voucherId}>\n` +
+        `**Member:** <@${targetId}>\n` +
+        `**Position:** ${type.toUpperCase()}\n` +
+        `**Role assigned:** <@&${role.id}>\n` +
+        `**Vouches used:** ${voucherData[type].length}/${limit}\n` +
+        `**Vouches remaining:** ${remaining}`,
+      components: []
+    });
+  } catch (error) {
+    console.error("[ZOMB VOUCH ERROR]", error);
+
+    return interaction.update({
+      content:
+        "❌ ZOMB could not verify the role assignment. Your vouch was not used.",
+      components: []
+    });
+  }
+}
+
+// ==========================================
+// ZOMB STRIPSTAFF SELECT MENU
+// ==========================================
+
+if (interaction.isStringSelectMenu() && interaction.customId.startsWith("zomb_strip|")) {
+  const parts = interaction.customId.split("|");
+  const [, guildId, voucherId] = parts;
+
+  if (interaction.user.id !== voucherId || interaction.guildId !== guildId) {
+    return interaction.reply({
+      content: "❌ This menu belongs to someone else.",
+      ephemeral: true
+    });
+  }
+
+  const trusted = antiNukeData.trusted[guildId] || [];
+
+  if (
+    interaction.user.id !== interaction.guild.ownerId &&
+    !trusted.includes(interaction.user.id)
+  ) {
+    return interaction.reply({
+      content: "❌ You are no longer trusted.",
+      ephemeral: true
+    });
+  }
+
+  const [type, targetId] = interaction.values[0].split(":");
+
+  if (!["staff", "admin"].includes(type)) {
+    return interaction.update({
+      content: "❌ Invalid vouch selection.",
+      components: []
+    });
+  }
+
+  const voucherData =
+    antiNukeData.vouches?.[guildId]?.[voucherId];
+
+  const roleId =
+    antiNukeData.vouchRoles?.[guildId]?.[voucherId]?.[type]?.[targetId];
+
+  if (!voucherData?.[type]?.includes(targetId)) {
+    return interaction.update({
+      content: "❌ That vouch could not be found.",
+      components: []
+    });
+  }
+
+  if (!roleId) {
+    return interaction.update({
+      content:
+        "❌ ZOMB does not have the saved role information for this older vouch. New vouches will save it automatically.",
+      components: []
+    });
+  }
+
+  const targetMember = await interaction.guild.members
+    .fetch(targetId)
+    .catch(() => null);
+
+  const role = await interaction.guild.roles
+    .fetch(roleId)
+    .catch(() => null);
+
+  if (!targetMember || !role) {
+    return interaction.update({
+      content: "❌ The member or role could not be found.",
+      components: []
+    });
+  }
+
+  try {
+    if (targetMember.roles.cache.has(roleId)) {
+      await targetMember.roles.remove(
+        role,
+        `ZOMB vouch removed by ${interaction.user.tag}`
+      );
+    }
+
+    voucherData[type] = voucherData[type].filter(
+      id => id !== targetId
+    );
+
+    delete antiNukeData.vouchRoles[guildId][voucherId][type][targetId];
+
+    saveAntiNukeData();
+
+    return interaction.update({
+      content:
+        `✅ **VOUCH REMOVED**\n\n` +
+        `**Member:** <@${targetId}>\n` +
+        `**Position:** ${type.toUpperCase()}\n` +
+        `**Role removed:** <@&${roleId}>\n` +
+        "Your vouch slot has been restored.",
+      components: []
+    });
+  } catch (error) {
+    console.error("[ZOMB STRIPSTAFF ERROR]", error);
+
+    return interaction.update({
+      content: "❌ ZOMB could not remove that role. Check its role permissions and hierarchy.",
+      components: []
+    });
+  }
+}
+  if (!interaction.isChatInputCommand()) return;
   if (interaction.commandName === "ping") {
     return interaction.reply({
       content: `🏓 ZOMB latency: ${client.ws.ping}ms`,
@@ -1081,175 +1411,66 @@ client.on("messageCreate", async message => {
   // ZOMB VOUCH COMMAND
   // ==========================================
 
-  if (command === "~vouch") {
-    const guildId = message.guild.id;
-    const trusted = antiNukeData.trusted[guildId] || [];
+ if (command === "~vouch") {
+  const guildId = message.guild.id;
+  const trusted = antiNukeData.trusted[guildId] || [];
 
-    if (
-      message.author.id !== message.guild.ownerId &&
-      !trusted.includes(message.author.id)
-    ) {
-      return message.reply(
-        "❌ Only trusted members can use the vouch system."
-      );
-    }
+  if (
+    message.author.id !== message.guild.ownerId &&
+    !trusted.includes(message.author.id)
+  ) {
+    return message.reply("❌ Only trusted members can use the vouch system.");
+  }
 
-    const targetUser = message.mentions.users.first();
-    const type = (args[2] || "").toLowerCase();
+  const targetUser = message.mentions.users.first();
 
-    if (!targetUser || !["staff", "admin"].includes(type)) {
-      return message.reply(
-        "**VOUCH USAGE**\n" +
-        "`~vouch @member staff @StaffRole`\n" +
-        "`~vouch @member admin @AdminRole`"
-      );
-    }
+  if (!targetUser) {
+    return message.reply("Usage: `~vouch @member`");
+  }
 
-    if (
-      targetUser.bot ||
-      targetUser.id === message.author.id
-    ) {
-      return message.reply(
-        "❌ You cannot vouch for bots or yourself."
-      );
-    }
+  if (
+    targetUser.bot ||
+    targetUser.id === message.author.id ||
+    targetUser.id === message.guild.ownerId
+  ) {
+    return message.reply("❌ You cannot vouch for that member.");
+  }
 
-    const voucherMember = await message.guild.members
-      .fetch(message.author.id)
-      .catch(() => null);
+  const voucherData =
+    antiNukeData.vouches[guildId]?.[message.author.id] || {
+      staff: [],
+      admin: []
+    };
 
-    const targetMember = await message.guild.members
-      .fetch(targetUser.id)
-      .catch(() => null);
-
-    if (!voucherMember || !targetMember) {
-      return message.reply(
-        "❌ Could not find the voucher or target member in this server."
-      );
-    }
-
-    if (targetMember.id === message.guild.ownerId) {
-      return message.reply(
-        "❌ The server owner cannot receive a vouch."
-      );
-    }
-
-    if (!antiNukeData.vouches[guildId]) {
-      antiNukeData.vouches[guildId] = {};
-    }
-
-    if (!antiNukeData.vouches[guildId][message.author.id]) {
-      antiNukeData.vouches[guildId][message.author.id] = {
-        staff: [],
-        admin: []
-      };
-    }
-
-    const voucherData =
-      antiNukeData.vouches[guildId][message.author.id];
-
-    if (!Array.isArray(voucherData.staff)) {
-      voucherData.staff = [];
-    }
-
-    if (!Array.isArray(voucherData.admin)) {
-      voucherData.admin = [];
-    }
-
-    const used = voucherData[type].length;
-    const limit = VOUCH_LIMITS[type];
-
-    if (voucherData[type].includes(targetUser.id)) {
-      return message.reply(
-        `⚠️ You have already vouched for ${targetUser} as ${type}.`
-      );
-    }
-
-    if (used >= limit) {
-      return message.reply(
-        `❌ You have used all your ${type} vouches.\n` +
-        `Your limit is ${limit} ${type} vouches.`
-      );
-    }
-
-    const role = message.mentions.roles.first();
-
-    if (!role) {
-      return message.reply(
-        "❌ You must mention the Staff or Admin role you want to assign."
-      );
-    }
-
-    const isAdminRole = role.permissions.has(
-      PermissionsBitField.Flags.Administrator
-    );
-
-    const isStaffRole =
-      !isAdminRole &&
-      role.permissions.has(PermissionsBitField.Flags.ManageRoles) &&
-      STAFF_EXTRA_PERMISSIONS.some(permission =>
-        role.permissions.has(permission)
-      );
-
-    if (type === "admin" && !isAdminRole) {
-      return message.reply(
-        "❌ That role does not have Administrator permission."
-      );
-    }
-
-    if (type === "staff" && !isStaffRole) {
-      return message.reply(
-        "❌ That role does not qualify as Staff."
-      );
-    }
-
-    const botMember = message.guild.members.me;
-
-    if (
-      !botMember ||
-      role.position >= voucherMember.roles.highest.position ||
-      role.position >= botMember.roles.highest.position ||
-      !role.editable
-    ) {
-      return message.reply(
-        "❌ That role is too high for you or ZOMB to assign."
-      );
-    }
-
-    if (targetMember.roles.cache.has(role.id)) {
-      return message.reply(
-        `⚠️ ${targetMember} already has the ${role} role. Your vouch was not used.`
-      );
-    }
-
-    try {
-      await targetMember.roles.add(
-        role,
-        `ZOMB ${type} vouch by ${message.author.tag}`
-      );
-
-      voucherData[type].push(targetUser.id);
-      saveAntiNukeData();
-
-      const remaining = limit - voucherData[type].length;
-
-      return message.reply(
-        `✅ **VOUCH SUCCESSFUL**\n\n` +
-        `**Voucher:** ${message.author}\n` +
-        `**Member:** ${targetMember}\n` +
-        `**Position:** ${type.toUpperCase()}\n` +
-        `**Role assigned:** ${role}\n` +
-        `**Vouches used:** ${voucherData[type].length}/${limit}\n` +
-        `**Vouches remaining:** ${remaining}`
-      );
-    } catch (error) {
-      console.error("[ZOMB VOUCH ERROR]", error);
-
-      return message.reply(
-        "❌ ZOMB could not assign the role. Make sure ZOMB has Manage Roles and its highest role is above the role it needs to assign. Your vouch was not used."
-      );
+  for (const type of ["staff", "admin"]) {
+    if (!Array.isArray(voucherData[type])) {
+      voucherData[type] = [];
     }
   }
+
+  antiNukeData.vouches[guildId] ??= {};
+  antiNukeData.vouches[guildId][message.author.id] = voucherData;
+
+  const row = new ActionRowBuilder().addComponents(
+    new ButtonBuilder()
+      .setCustomId(`zomb_vouch_type|${guildId}|${message.author.id}|${targetUser.id}|staff`)
+      .setLabel("Staff")
+      .setStyle(ButtonStyle.Primary),
+
+    new ButtonBuilder()
+      .setCustomId(`zomb_vouch_type|${guildId}|${message.author.id}|${targetUser.id}|admin`)
+      .setLabel("Admin")
+      .setStyle(ButtonStyle.Danger)
+  );
+
+  return message.reply({
+    content:
+      `**ZOMB VOUCH SYSTEM**\n\n` +
+      `**Member:** ${targetUser}\n\n` +
+      "Choose which position you want to vouch for:",
+    components: [row]
+  });
+}
 
   // ==========================================
   // ZOMB VOUCH LIST
@@ -1285,7 +1506,73 @@ client.on("messageCreate", async message => {
       `**Admin remaining:** ${VOUCH_LIMITS.admin - adminUsed}`
     );
   }
+// ==========================================
+// ZOMB STRIPSTAFF COMMAND
+// ==========================================
 
+if (command === "~stripstaff") {
+  const guildId = message.guild.id;
+  const trusted = antiNukeData.trusted[guildId] || [];
+
+  if (
+    message.author.id !== message.guild.ownerId &&
+    !trusted.includes(message.author.id)
+  ) {
+    return message.reply(
+      "❌ Only trusted members can use ~stripstaff."
+    );
+  }
+
+  const voucherData =
+    antiNukeData.vouches?.[guildId]?.[message.author.id];
+
+  if (!voucherData) {
+    return message.reply("You have no vouches to remove.");
+  }
+
+  const options = [];
+
+  for (const type of ["staff", "admin"]) {
+    for (const targetId of voucherData[type] || []) {
+      const target = await message.guild.members
+        .fetch(targetId)
+        .catch(() => null);
+
+      if (!target) continue;
+
+      const roleId =
+        antiNukeData.vouchRoles?.[guildId]?.[message.author.id]?.[type]?.[targetId];
+
+      const role = roleId
+        ? await message.guild.roles.fetch(roleId).catch(() => null)
+        : null;
+
+      options.push({
+        label: `${type.toUpperCase()} - ${target.user.username}`.slice(0, 100),
+        description: role
+          ? `Remove the ${role.name} role`
+          : "Previous vouch - role information unavailable",
+        value: `${type}:${targetId}`
+      });
+    }
+  }
+
+  if (options.length === 0) {
+    return message.reply("You have no active vouches to remove.");
+  }
+
+  const menu = new StringSelectMenuBuilder()
+    .setCustomId(`zomb_strip|${guildId}|${message.author.id}`)
+    .setPlaceholder("Select a member whose vouch you want to remove")
+    .addOptions(options.slice(0, 25));
+
+  return message.reply({
+    content: "**ZOMB STRIPSTAFF**\nSelect a person to remove your vouch from:",
+    components: [
+      new ActionRowBuilder().addComponents(menu)
+    ]
+  });
+}
   // ==========================================
   // ANTI-NUKE COMMANDS
   // ==========================================
