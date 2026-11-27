@@ -1949,7 +1949,7 @@ if (
 
 const search = roleInput.toLowerCase();
 
-cconst search = roleInput
+const search = roleInput
   .toLowerCase()
   .replace(/[‘’]/g, "'")
   .trim();
