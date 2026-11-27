@@ -1813,6 +1813,45 @@ if (
 });
 
 // ==========================================
+// ZOMB SNIPE SYSTEM
+// ==========================================
+
+const snipeCache = new Map();
+const SNIPE_LIMIT = 10;
+
+client.on("messageDelete", async message => {
+  try {
+    if (message.partial) {
+      message = await message.fetch().catch(() => null);
+    }
+
+    if (!message || !message.guild || !message.author) return;
+
+    const channelId = message.channel.id;
+
+    if (!snipeCache.has(channelId)) {
+      snipeCache.set(channelId, []);
+    }
+
+    const deletedMessages = snipeCache.get(channelId);
+
+    deletedMessages.unshift({
+      author: message.author.tag,
+      authorId: message.author.id,
+      content: message.content || "*No text content*",
+      attachments: [...message.attachments.values()].map(a => a.url),
+      deletedAt: Date.now()
+    });
+
+    if (deletedMessages.length > SNIPE_LIMIT) {
+      deletedMessages.length = SNIPE_LIMIT;
+    }
+  } catch (error) {
+    console.error("[ZOMB SNIPE ERROR]", error);
+  }
+});
+
+// ==========================================
 // PREFIX COMMAND HANDLER
 // ==========================================
 
