@@ -3132,6 +3132,122 @@ if (command === "~jail" || command === "~unjail") {
   const trustedList = antiNukeData.trusted[guildId];
 
   // ==========================================
+  // ANTI-NUKE WHITELIST
+  // ==========================================
+
+  if (!Array.isArray(antiNukeData.whitelist[guildId])) {
+    antiNukeData.whitelist[guildId] = [];
+  }
+
+  const whitelist = antiNukeData.whitelist[guildId];
+
+  if (action === "whitelist") {
+    const setting = (args[2] || "").toLowerCase();
+
+    // ADD MEMBER
+    if (setting === "add") {
+      const userId =
+        message.mentions.users.first()?.id ||
+        args[3]?.match(/^\d{17,20}$/)?.[0];
+
+      if (!userId) {
+        return message.reply(
+          "Usage: `~an whitelist add @user`"
+        );
+      }
+
+      const member = await message.guild.members
+        .fetch(userId)
+        .catch(() => null);
+
+      if (!member) {
+        return message.reply("That member is not in this server.");
+      }
+
+      if (whitelist.includes(userId)) {
+        return message.reply("That member is already whitelisted.");
+      }
+
+      whitelist.push(userId);
+
+      if (!saveAntiNukeData()) {
+        whitelist.pop();
+        return message.reply("ZOMB could not save the whitelist change.");
+      }
+
+      return message.reply(
+        `✅ ${member.user.username} has been added to the anti-nuke whitelist.`
+      );
+    }
+
+    // REMOVE MEMBER
+    if (setting === "remove") {
+      const userId =
+        message.mentions.users.first()?.id ||
+        args[3]?.match(/^\d{17,20}$/)?.[0];
+
+      if (!userId) {
+        return message.reply(
+          "Usage: `~an whitelist remove @user`"
+        );
+      }
+
+      if (!whitelist.includes(userId)) {
+        return message.reply("That member is not whitelisted.");
+      }
+
+      const oldWhitelist = [...whitelist];
+
+      antiNukeData.whitelist[guildId] =
+        whitelist.filter(id => id !== userId);
+
+      if (!saveAntiNukeData()) {
+        antiNukeData.whitelist[guildId] = oldWhitelist;
+        return message.reply("ZOMB could not save the whitelist change.");
+      }
+
+      return message.reply(
+        `✅ <@${userId}> has been removed from the anti-nuke whitelist.`
+      );
+    }
+
+    // VIEW WHITELIST
+    if (setting === "list") {
+      if (whitelist.length === 0) {
+        return message.reply("The anti-nuke whitelist is currently empty.");
+      }
+
+      const members = await Promise.all(
+        whitelist.map(id =>
+          message.guild.members.fetch(id).catch(() => null)
+        )
+      );
+
+      const entries = whitelist.map((id, index) =>
+        members[index]
+          ? `• ${members[index].user.username} (<@${id}>)`
+          : `• <@${id}>`
+      );
+
+      return message.reply({
+        embeds: [
+          zombEmbed(
+            "ANTI-NUKE WHITELIST",
+            entries.join("\n")
+          )
+        ]
+      });
+    }
+
+    return message.reply(
+      "**WHITELIST COMMANDS**\n\n" +
+      "`~an whitelist add @user` — Add a member\n" +
+      "`~an whitelist remove @user` — Remove a member\n" +
+      "`~an whitelist list` — View whitelisted members"
+    );
+  }
+
+  // ==========================================
   // TRUST MEMBER
   // ==========================================
 
