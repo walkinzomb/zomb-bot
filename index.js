@@ -1924,6 +1924,7 @@ client.on("messageCreate", async message => {
   const args = message.content.trim().split(/\s+/);
   const command = args[0].toLowerCase();
   
+
 // ==========================================
 // ZOMB ROLE COMMANDS
 // ==========================================
@@ -1938,23 +1939,19 @@ if (
     return message.reply("You need Manage Roles permission to use this command.");
   }
 
-  // ROLE INFO COMMANDS
+  // ROLE INFO
   if (command === "~ir" || command === "~roleinfo") {
- const roleInput =
-  message.mentions.roles.first()?.id ||
-  args.slice(2).join(" ").trim();
+    const roleInput =
+      message.mentions.roles.first()?.id ||
+      args.slice(1).join(" ").trim();
 
-    if (!roleId) {
-      return message.reply("Usage: `~ir @role` or `~ir ROLE_ID`");
-    }
+    await message.guild.roles.fetch();
 
-  await message.guild.roles.fetch();
-
-const role = message.guild.roles.cache.find(
-  r =>
-    r.id === roleInput ||
-    r.name.toLowerCase() === roleInput.toLowerCase()
-);
+    const role = message.guild.roles.cache.find(
+      r =>
+        r.id === roleInput ||
+        r.name.toLowerCase() === roleInput.toLowerCase()
+    );
 
     if (!role) {
       return message.reply("I couldn't find that role in this server.");
@@ -1977,18 +1974,18 @@ const role = message.guild.roles.cache.find(
     return message.reply({ embeds: [embed] });
   }
 
-  // ROLE TOGGLE COMMANDS
+  // ROLE TOGGLE
   const targetId =
     message.mentions.users.first()?.id ||
     args[1]?.replace(/[<@!>]/g, "");
 
-  const roleId =
+  const roleInput =
     message.mentions.roles.first()?.id ||
-    (args[2] && /^\d{17,20}$/.test(args[2]) ? args[2] : null);
+    args.slice(2).join(" ").trim();
 
-  if (!targetId || !roleId || !/^\d{17,20}$/.test(targetId)) {
+  if (!targetId || !roleInput || !/^\d{17,20}$/.test(targetId)) {
     return message.reply(
-      "Usage: `~r @user @role` or `~r USER_ID ROLE_ID`"
+      "Usage: `~r @user Role Name` or `~r USER_ID ROLE_ID`"
     );
   }
 
@@ -2000,7 +1997,13 @@ const role = message.guild.roles.cache.find(
     return message.reply("I couldn't find that member in this server.");
   }
 
-  const role = await message.guild.roles.fetch(roleId).catch(() => null);
+  await message.guild.roles.fetch();
+
+  const role = message.guild.roles.cache.find(
+    r =>
+      r.id === roleInput ||
+      r.name.toLowerCase() === roleInput.toLowerCase()
+  );
 
   if (!role) {
     return message.reply("I couldn't find that role in this server.");
@@ -2016,18 +2019,15 @@ const role = message.guild.roles.cache.find(
     return message.reply("That role is above or equal to ZOMB's highest role.");
   }
 
- 
-
   if (targetMember.roles.cache.has(role.id)) {
     await targetMember.roles.remove(role);
-
     return message.reply(`${role} has been removed from ${targetMember}.`);
   }
 
   await targetMember.roles.add(role);
-
   return message.reply(`${role} has been added to ${targetMember}.`);
 }
+
 
 // ==========================================
 // ZOMB SNIPE COMMANDS
