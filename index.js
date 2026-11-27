@@ -1821,6 +1821,7 @@ const SNIPE_LIMIT = 10;
 
 client.on("messageDelete", async message => {
   try {
+    console.log("[ZOMB SNIPE] Delete event detected:", message.id, "Partial:", message.partial);
     if (message.partial) {
       message = await message.fetch().catch(() => null);
     }
