@@ -2279,6 +2279,7 @@ if (command === "~unmute") {
   }
 }
 
+
 // ==========================================
 // JAIL SETUP / JAIL / UNJAIL
 // ==========================================
@@ -2298,11 +2299,17 @@ if (command === "~jail" || command === "~unjail") {
   if (
     !botMember?.permissions.has(
       PermissionsBitField.Flags.ManageRoles
+    ) ||
+    !botMember.permissions.has(
+      PermissionsBitField.Flags.ManageChannels
     )
   ) {
-    return message.reply("ZOMB needs the Manage Roles permission.");
+    return message.reply(
+      "ZOMB needs Manage Roles and Manage Channels permissions."
+    );
   }
 
+  // JAIL SETUP
   if (
     command === "~jail" &&
     args[1]?.toLowerCase() === "setup"
@@ -2319,27 +2326,131 @@ if (command === "~jail" || command === "~unjail") {
       jailRole.position >= botMember.roles.highest.position ||
       !jailRole.editable
     ) {
-      return message.reply("That jail role must be below your highest role and ZOMB's highest role.");
+      return message.reply(
+        "That jail role must be below your highest role and ZOMB's highest role."
+      );
     }
 
-    antiNukeData.jailRoles[guildId] = jailRole.id;
+    try {
+      // Find an existing jail channel or create one
+      let jailChannel = null;
 
-    if (!saveAntiNukeData()) {
-      delete antiNukeData.jailRoles[guildId];
-      return message.reply("ZOMB could not save the jail role.");
+      const savedChannelId = antiNukeData.jailChannels[guildId];
+
+      if (savedChannelId) {
+        jailChannel = await message.guild.channels
+          .fetch(savedChannelId)
+          .catch(() => null);
+      }
+
+      if (!jailChannel) {
+        jailChannel = await message.guild.channels.create({
+          name: "jail",
+          type: 0,
+          reason: "ZOMB jail system setup",
+          permissionOverwrites: [
+            {
+              id: message.guild.roles.everyone.id,
+              deny: [
+                PermissionsBitField.Flags.ViewChannel
+              ]
+            },
+            {
+              id: jailRole.id,
+              allow: [
+                PermissionsBitField.Flags.ViewChannel,
+                PermissionsBitField.Flags.SendMessages,
+                PermissionsBitField.Flags.ReadMessageHistory
+              ]
+            },
+            {
+              id: botMember.id,
+              allow: [
+                PermissionsBitField.Flags.ViewChannel,
+                PermissionsBitField.Flags.SendMessages,
+                PermissionsBitField.Flags.ReadMessageHistory,
+                PermissionsBitField.Flags.ManageChannels
+              ]
+            }
+          ]
+        });
+      }
+
+      // Make sure the jail role can access the jail channel
+      await jailChannel.permissionOverwrites.edit(jailRole.id, {
+        ViewChannel: true,
+        SendMessages: true,
+        ReadMessageHistory: true
+      });
+
+      // Give staff roles access to the jail channel
+      for (const role of message.guild.roles.cache.values()) {
+        if (
+          role.id === message.guild.roles.everyone.id ||
+          role.id === jailRole.id
+        ) continue;
+
+        const isStaff =
+          role.permissions.has(
+            PermissionsBitField.Flags.Administrator
+          ) ||
+          role.permissions.has(
+            PermissionsBitField.Flags.ManageMessages
+          ) ||
+          role.permissions.has(
+            PermissionsBitField.Flags.ManageRoles
+          );
+
+        if (isStaff) {
+          await jailChannel.permissionOverwrites.edit(role.id, {
+            ViewChannel: true,
+            SendMessages: true,
+            ReadMessageHistory: true
+          });
+        }
+      }
+
+      // Hide every other server channel from the jail role
+      await message.guild.channels.fetch();
+
+      for (const channel of message.guild.channels.cache.values()) {
+        if (channel.id === jailChannel.id) continue;
+
+        await channel.permissionOverwrites.edit(jailRole.id, {
+          ViewChannel: false
+        });
+      }
+
+      antiNukeData.jailRoles[guildId] = jailRole.id;
+      antiNukeData.jailChannels[guildId] = jailChannel.id;
+
+      if (!saveAntiNukeData()) {
+        return message.reply(
+          "The jail channel was configured, but ZOMB could not save the setup."
+        );
+      }
+
+      return message.reply({
+        embeds: [
+          zombEmbed(
+            "JAIL SYSTEM CONFIGURED",
+            `**Jail role:** ${jailRole}\n` +
+            `**Jail channel:** ${jailChannel}\n\n` +
+            "Jailed members can access the jail channel. Other channels are hidden from the jail role.",
+            0x57F287
+          )
+        ]
+      });
+
+    } catch (error) {
+      console.error("[ZOMB JAIL SETUP ERROR]", error);
+      return message.reply(
+        "ZOMB could not finish jail setup. Check that it has Manage Channels and Manage Roles."
+      );
     }
-
-    return message.reply({
-      embeds: [
-        zombEmbed(
-          "JAIL ROLE CONFIGURED",
-          `Jail role: ${jailRole}`,
-          0x57F287
-        )
-      ]
-    });
   }
 
+  // JAIL / UNJAIL MEMBER
   if (!validModerationTarget) {
     return message.reply(
       command === "~jail"
@@ -2360,21 +2471,38 @@ if (command === "~jail" || command === "~unjail") {
     message.author.id !== message.guild.ownerId &&
     target.roles.highest.position >= message.member.roles.highest.position
   ) {
-    return message.reply("You cannot manage someone with an equal or higher role.");
+    return message.reply(
+      "You cannot manage someone with an equal or higher role."
+    );
   }
 
   const jailRoleId = antiNukeData.jailRoles[guildId];
+  const jailChannelId = antiNukeData.jailChannels[guildId];
 
-  if (!jailRoleId) {
-    return message.reply("No jail role is configured. Use `~jail setup @role` first.");
+  if (!jailRoleId || !jailChannelId) {
+    return message.reply(
+      "Jail is not configured. Use `~jail setup @jailed` first."
+    );
   }
 
   const jailRole = await message.guild.roles
     .fetch(jailRoleId)
     .catch(() => null);
 
+  const jailChannel = await message.guild.channels
+    .fetch(jailChannelId)
+    .catch(() => null);
+
   if (!jailRole || !jailRole.editable) {
-    return message.reply("The configured jail role is missing or cannot be managed by ZOMB.");
+    return message.reply(
+      "The configured jail role is missing or cannot be managed by ZOMB."
+    );
+  }
+
+  if (!jailChannel) {
+    return message.reply(
+      "The jail channel is missing. Run `~jail setup @jailed` again."
+    );
   }
 
   try {
@@ -2388,12 +2516,25 @@ if (command === "~jail" || command === "~unjail") {
         `Jailed by ${message.author.tag}`
       );
 
+      await jailChannel.send({
+        embeds: [
+          zombEmbed(
+            "MEMBER JAILED",
+            `**Member:** ${target}\n` +
+            `**Moderator:** ${message.author}\n\n` +
+            "This member has been placed in jail.",
+            0xED4245
+          )
+        ]
+      });
+
       return message.reply({
         embeds: [
           zombEmbed(
             "MEMBER JAILED",
             `**Member:** ${target.user.tag}\n` +
             `**Jail role:** ${jailRole}\n` +
+            `**Jail channel:** ${jailChannel}\n` +
             `**Moderator:** ${message.author}`,
             0xED4245
           )
@@ -2410,6 +2551,17 @@ if (command === "~jail" || command === "~unjail") {
       `Released by ${message.author.tag}`
     );
 
+    await jailChannel.send({
+      embeds: [
+        zombEmbed(
+          "MEMBER RELEASED",
+          `**Member:** ${target}\n` +
+          `**Moderator:** ${message.author}`,
+          0x57F287
+        )
+      ]
+    });
+
     return message.reply({
       embeds: [
         zombEmbed(
@@ -2420,11 +2572,15 @@ if (command === "~jail" || command === "~unjail") {
         )
       ]
     });
+
   } catch (error) {
     console.error("[ZOMB JAIL ERROR]", error);
-    return message.reply("ZOMB could not change that member's jail role.");
+    return message.reply(
+      "ZOMB could not complete the jail action. Check its role hierarchy and channel permissions."
+    );
   }
 }
+
   // ==========================================
   // ZOMB CHANNEL NUKE
   // ==========================================
