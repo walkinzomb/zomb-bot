@@ -1,4 +1,3 @@
-
 const fs = require("fs");
 const path = require("path");
 
@@ -57,7 +56,8 @@ let antiNukeData = {
   enabled: {},
   logs: {},
   punishment: {},
-  antiBot: {}
+  antiBot: {},
+  vouches: {}
 };
 
 function loadAntiNukeData() {
@@ -78,7 +78,8 @@ function loadAntiNukeData() {
         enabled: saved.enabled || {},
         logs: saved.logs || {},
         punishment: saved.punishment || {},
-        antiBot: saved.antiBot || {}
+        antiBot: saved.antiBot || {},
+        vouches: saved.vouches || {}
       };
     }
 
@@ -114,6 +115,76 @@ function saveAntiNukeData() {
 }
 
 loadAntiNukeData();
+
+// ==========================================
+// VOUCH SYSTEM
+// ==========================================
+
+const VOUCH_LIMITS = {
+  staff: 3,
+  admin: 2
+};
+
+const STAFF_EXTRA_PERMISSIONS = [
+  PermissionsBitField.Flags.ManageGuild,
+  PermissionsBitField.Flags.ManageChannels,
+  PermissionsBitField.Flags.KickMembers,
+  PermissionsBitField.Flags.BanMembers,
+  PermissionsBitField.Flags.ManageMessages,
+  PermissionsBitField.Flags.ModerateMembers,
+  PermissionsBitField.Flags.ManageWebhooks,
+  PermissionsBitField.Flags.ManageNicknames,
+  PermissionsBitField.Flags.ViewAuditLog
+];
+
+function findVouchRole(guild, voucherMember, type) {
+  const botMember = guild.members.me;
+
+  if (!botMember) return null;
+
+  const eligibleRoles = guild.roles.cache
+    .filter(role => {
+      if (role.id === guild.id) return false;
+
+      if (role.position >= voucherMember.roles.highest.position) {
+        return false;
+      }
+
+      if (role.position >= botMember.roles.highest.position) {
+        return false;
+      }
+
+      if (!role.editable) return false;
+
+      const isAdmin = role.permissions.has(
+        PermissionsBitField.Flags.Administrator
+      );
+
+      if (type === "admin") {
+        return isAdmin;
+      }
+
+      if (type === "staff") {
+        if (isAdmin) return false;
+
+        const hasManageRoles = role.permissions.has(
+          PermissionsBitField.Flags.ManageRoles
+        );
+
+        const hasExtraStaffPermission =
+          STAFF_EXTRA_PERMISSIONS.some(permission =>
+            role.permissions.has(permission)
+          );
+
+        return hasManageRoles && hasExtraStaffPermission;
+      }
+
+      return false;
+    })
+    .sort((a, b) => b.position - a.position);
+
+  return eligibleRoles.first() || null;
+}
 
 // ==========================================
 // ANTI-NUKE THRESHOLDS
@@ -926,6 +997,9 @@ client.on("interactionCreate", async interaction => {
       content:
         "**ZOMB COMMANDS**\n\n" +
         "`~nuke` — Restart the current channel\n" +
+        "`~vouch @member staff` — Vouch for Staff\n" +
+        "`~vouch @member admin` — Vouch for Admin\n" +
+        "`~vouchlist` — View your vouch usage\n" +
         "`~an` — Anti-Nuke help\n" +
         "`~an status` — Protection status\n" +
         "`~an trust @user` — Trust a member\n" +
@@ -1062,6 +1136,180 @@ client.on("messageCreate", async message => {
     }
 
     return;
+  }
+
+  // ==========================================
+  // ZOMB VOUCH COMMAND
+  // ==========================================
+
+  if (command === "~vouch") {
+    const guildId = message.guild.id;
+    const trusted = antiNukeData.trusted[guildId] || [];
+
+    if (!trusted.includes(message.author.id)) {
+      return message.reply(
+        "❌ Only members on the ZOMB trustlist can use the vouch system."
+      );
+    }
+
+    const targetUser = message.mentions.users.first();
+    const type = (args[2] || "").toLowerCase();
+
+    if (!targetUser || !["staff", "admin"].includes(type)) {
+      return message.reply(
+        "**VOUCH USAGE**\n" +
+        "`~vouch @member staff`\n" +
+        "`~vouch @member admin`"
+      );
+    }
+
+    if (
+      targetUser.bot ||
+      targetUser.id === message.author.id
+    ) {
+      return message.reply(
+        "❌ You cannot vouch for bots or yourself."
+      );
+    }
+
+    const voucherMember = await message.guild.members
+      .fetch(message.author.id)
+      .catch(() => null);
+
+    const targetMember = await message.guild.members
+      .fetch(targetUser.id)
+      .catch(() => null);
+
+    if (!voucherMember || !targetMember) {
+      return message.reply(
+        "❌ Could not find the voucher or target member in this server."
+      );
+    }
+
+    if (targetMember.id === message.guild.ownerId) {
+      return message.reply(
+        "❌ The server owner cannot receive a vouch."
+      );
+    }
+
+    if (!antiNukeData.vouches[guildId]) {
+      antiNukeData.vouches[guildId] = {};
+    }
+
+    if (!antiNukeData.vouches[guildId][message.author.id]) {
+      antiNukeData.vouches[guildId][message.author.id] = {
+        staff: [],
+        admin: []
+      };
+    }
+
+    const voucherData =
+      antiNukeData.vouches[guildId][message.author.id];
+
+    if (!Array.isArray(voucherData.staff)) {
+      voucherData.staff = [];
+    }
+
+    if (!Array.isArray(voucherData.admin)) {
+      voucherData.admin = [];
+    }
+
+    const used = voucherData[type].length;
+    const limit = VOUCH_LIMITS[type];
+
+    if (voucherData[type].includes(targetUser.id)) {
+      return message.reply(
+        `⚠️ You have already vouched for ${targetUser} as ${type}.`
+      );
+    }
+
+    if (used >= limit) {
+      return message.reply(
+        `❌ You have used all your ${type} vouches.\n` +
+        `Your limit is ${limit} ${type} vouches.`
+      );
+    }
+
+    const role = findVouchRole(
+      message.guild,
+      voucherMember,
+      type
+    );
+
+    if (!role) {
+      return message.reply(
+        type === "admin"
+          ? "❌ ZOMB could not find an assignable Administrator role below both your highest role and ZOMB's highest role."
+          : "❌ ZOMB could not find an assignable Staff role with Manage Roles and additional staff permissions below both your highest role and ZOMB's highest role."
+      );
+    }
+
+    if (targetMember.roles.cache.has(role.id)) {
+      return message.reply(
+        `⚠️ ${targetMember} already has the ${role} role. Your vouch was not used.`
+      );
+    }
+
+    try {
+      await targetMember.roles.add(
+        role,
+        `ZOMB ${type} vouch by ${message.author.tag}`
+      );
+
+      voucherData[type].push(targetUser.id);
+      saveAntiNukeData();
+
+      const remaining = limit - voucherData[type].length;
+
+      return message.reply(
+        `✅ **VOUCH SUCCESSFUL**\n\n` +
+        `**Voucher:** ${message.author}\n` +
+        `**Member:** ${targetMember}\n` +
+        `**Position:** ${type.toUpperCase()}\n` +
+        `**Role assigned:** ${role}\n` +
+        `**Vouches used:** ${voucherData[type].length}/${limit}\n` +
+        `**Vouches remaining:** ${remaining}`
+      );
+
+    } catch (error) {
+      console.error("[ZOMB VOUCH ERROR]", error);
+
+      return message.reply(
+        "❌ ZOMB could not assign the role. Make sure ZOMB has Manage Roles and its highest role is above the role it needs to assign. Your vouch was not used."
+      );
+    }
+  }
+
+  // ==========================================
+  // ZOMB VOUCH LIST
+  // ==========================================
+
+  if (command === "~vouchlist") {
+    const guildId = message.guild.id;
+    const trusted = antiNukeData.trusted[guildId] || [];
+
+    if (!trusted.includes(message.author.id)) {
+      return message.reply(
+        "❌ Only trusted members can view their vouch usage."
+      );
+    }
+
+    const voucherData =
+      antiNukeData.vouches?.[guildId]?.[message.author.id] || {
+        staff: [],
+        admin: []
+      };
+
+    const staffUsed = voucherData.staff?.length || 0;
+    const adminUsed = voucherData.admin?.length || 0;
+
+    return message.reply(
+      `**ZOMB VOUCH USAGE**\n\n` +
+      `**Staff:** ${staffUsed}/${VOUCH_LIMITS.staff}\n` +
+      `**Staff remaining:** ${VOUCH_LIMITS.staff - staffUsed}\n\n` +
+      `**Admin:** ${adminUsed}/${VOUCH_LIMITS.admin}\n` +
+      `**Admin remaining:** ${VOUCH_LIMITS.admin - adminUsed}`
+    );
   }
 
   // ==========================================
@@ -1384,6 +1632,9 @@ client.on("messageCreate", async message => {
 
   return message.reply(
     "**ZOMB SECURITY COMMANDS**\n\n" +
+    "`~vouch @member staff` — Vouch for Staff\n" +
+    "`~vouch @member admin` — Vouch for Admin\n" +
+    "`~vouchlist` — View your vouch usage\n" +
     "`~an trust @user` — Trust a member\n" +
     "`~an trust USER_ID` — Trust by ID\n" +
     "`~an untrust @user` — Remove a trusted member\n" +
