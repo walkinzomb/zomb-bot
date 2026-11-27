@@ -1947,10 +1947,12 @@ if (
 
   await message.guild.roles.fetch();
 
-const matches = message.guild.roles.cache.filter(
-  r =>
-    r.id === roleInput ||
-    r.name.toLowerCase().includes(roleInput.toLowerCase())
+const search = roleInput.toLowerCase();
+
+const matches = message.guild.roles.cache.filter(r =>
+  r.id === roleInput ||
+  r.name.toLowerCase().includes(search) ||
+  search.includes(r.name.toLowerCase())
 );
 
 if (matches.size === 0) {
