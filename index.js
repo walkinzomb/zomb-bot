@@ -1154,11 +1154,18 @@ if (interaction.isRoleSelectMenu() && interaction.customId.startsWith("zomb_vouc
 // ZOMB STRIPSTAFF SELECT MENU
 // ==========================================
 
-if (interaction.isStringSelectMenu() && interaction.customId.startsWith("zomb_strip|")) {
+
+if (
+  interaction.isStringSelectMenu() &&
+  interaction.customId.startsWith("zomb_strip|")
+) {
   const parts = interaction.customId.split("|");
   const [, guildId, voucherId] = parts;
 
-  if (interaction.user.id !== voucherId || interaction.guildId !== guildId) {
+  if (
+    interaction.user.id !== voucherId ||
+    interaction.guildId !== guildId
+  ) {
     return interaction.reply({
       content: "❌ This menu belongs to someone else.",
       ephemeral: true
@@ -1189,8 +1196,133 @@ if (interaction.isStringSelectMenu() && interaction.customId.startsWith("zomb_st
   const voucherData =
     antiNukeData.vouches?.[guildId]?.[voucherId];
 
+  if (!voucherData?.[type]?.includes(targetId)) {
+    return interaction.update({
+      content: "❌ That vouch could not be found.",
+      components: []
+    });
+  }
+
+  const targetMember = await interaction.guild.members
+    .fetch(targetId)
+    .catch(() => null);
+
+  if (!targetMember) {
+    return interaction.update({
+      content: "❌ That member could not be found.",
+      components: []
+    });
+  }
+
   const roleId =
     antiNukeData.vouchRoles?.[guildId]?.[voucherId]?.[type]?.[targetId];
+
+  const role = roleId
+    ? await interaction.guild.roles.fetch(roleId).catch(() => null)
+    : null;
+
+  // Older vouch or deleted saved role: ask trusted member to select it.
+  if (!role) {
+    const roleMenu = new RoleSelectMenuBuilder()
+      .setCustomId(
+        `zomb_strip_role|${guildId}|${voucherId}|${type}|${targetId}`
+      )
+      .setPlaceholder("Select the role originally given")
+      .setMinValues(1)
+      .setMaxValues(1);
+
+    return interaction.update({
+      content:
+        "⚠️ **OLDER VOUCH DETECTED**\n\n" +
+        `Member: <@${targetId}>\n` +
+        `Position: **${type.toUpperCase()}**\n\n` +
+        "ZOMB does not have the saved role information.\n" +
+        "Select the role that was originally given. ZOMB will verify that the member has it before removing it.",
+      components: [
+        new ActionRowBuilder().addComponents(roleMenu)
+      ]
+    });
+  }
+
+  try {
+    if (targetMember.roles.cache.has(role.id)) {
+      await targetMember.roles.remove(
+        role,
+        `ZOMB vouch removed by ${interaction.user.tag}`
+      );
+    }
+
+    voucherData[type] = voucherData[type].filter(
+      id => id !== targetId
+    );
+
+    delete antiNukeData.vouchRoles?.[guildId]?.[voucherId]?.[type]?.[targetId];
+
+    saveAntiNukeData();
+
+    return interaction.update({
+      content:
+        `✅ **VOUCH REMOVED**\n\n` +
+        `**Member:** <@${targetId}>\n` +
+        `**Position:** ${type.toUpperCase()}\n` +
+        `**Role removed:** <@&${role.id}>\n` +
+        "Your vouch slot has been restored.",
+      components: []
+    });
+  } catch (error) {
+    console.error("[ZOMB STRIPSTAFF ERROR]", error);
+
+    return interaction.update({
+      content:
+        "❌ ZOMB could not remove that role. Check its role permissions and hierarchy.",
+      components: []
+    });
+  }
+}
+
+
+// ==========================================
+// OLDER VOUCH ROLE SELECTION
+// ==========================================
+
+if (
+  interaction.isRoleSelectMenu() &&
+  interaction.customId.startsWith("zomb_strip_role|")
+) {
+  const parts = interaction.customId.split("|");
+  const [, guildId, voucherId, type, targetId] = parts;
+
+  if (
+    interaction.user.id !== voucherId ||
+    interaction.guildId !== guildId
+  ) {
+    return interaction.reply({
+      content: "❌ This menu belongs to someone else.",
+      ephemeral: true
+    });
+  }
+
+  const trusted = antiNukeData.trusted[guildId] || [];
+
+  if (
+    interaction.user.id !== interaction.guild.ownerId &&
+    !trusted.includes(interaction.user.id)
+  ) {
+    return interaction.reply({
+      content: "❌ You are no longer trusted.",
+      ephemeral: true
+    });
+  }
+
+  if (!["staff", "admin"].includes(type)) {
+    return interaction.update({
+      content: "❌ Invalid vouch type.",
+      components: []
+    });
+  }
+
+  const voucherData =
+    antiNukeData.vouches?.[guildId]?.[voucherId];
 
   if (!voucherData?.[type]?.includes(targetId)) {
     return interaction.update({
@@ -1199,13 +1331,7 @@ if (interaction.isStringSelectMenu() && interaction.customId.startsWith("zomb_st
     });
   }
 
-  if (!roleId) {
-    return interaction.update({
-      content:
-        "❌ ZOMB does not have the saved role information for this older vouch. New vouches will save it automatically.",
-      components: []
-    });
-  }
+  const roleId = interaction.values[0];
 
   const targetMember = await interaction.guild.members
     .fetch(targetId)
@@ -1222,40 +1348,65 @@ if (interaction.isStringSelectMenu() && interaction.customId.startsWith("zomb_st
     });
   }
 
-  try {
-    if (targetMember.roles.cache.has(roleId)) {
-      await targetMember.roles.remove(
-        role,
-        `ZOMB vouch removed by ${interaction.user.tag}`
-      );
-    }
+  // Never remove a role that is not actually assigned to this member.
+  if (!targetMember.roles.cache.has(role.id)) {
+    return interaction.update({
+      content:
+        "❌ That member does not currently have the selected role. Your vouch was not removed.",
+      components: []
+    });
+  }
 
+  try {
+    await interaction.deferUpdate();
+
+    await targetMember.roles.remove(
+      role,
+      `ZOMB older vouch removed by ${interaction.user.tag}`
+    );
+
+    // Remove the old vouch and restore the available slot.
     voucherData[type] = voucherData[type].filter(
       id => id !== targetId
     );
+
+    // Save the recovered role information before clearing it.
+    if (!antiNukeData.vouchRoles[guildId]) {
+      antiNukeData.vouchRoles[guildId] = {};
+    }
+
+    if (!antiNukeData.vouchRoles[guildId][voucherId]) {
+      antiNukeData.vouchRoles[guildId][voucherId] = {};
+    }
+
+    if (!antiNukeData.vouchRoles[guildId][voucherId][type]) {
+      antiNukeData.vouchRoles[guildId][voucherId][type] = {};
+    }
 
     delete antiNukeData.vouchRoles[guildId][voucherId][type][targetId];
 
     saveAntiNukeData();
 
-    return interaction.update({
+    return interaction.editReply({
       content:
-        `✅ **VOUCH REMOVED**\n\n` +
+        `✅ **OLDER VOUCH REMOVED**\n\n` +
         `**Member:** <@${targetId}>\n` +
         `**Position:** ${type.toUpperCase()}\n` +
-        `**Role removed:** <@&${roleId}>\n` +
+        `**Role removed:** <@&${role.id}>\n` +
         "Your vouch slot has been restored.",
       components: []
     });
   } catch (error) {
-    console.error("[ZOMB STRIPSTAFF ERROR]", error);
+    console.error("[ZOMB OLD VOUCH STRIP ERROR]", error);
 
-    return interaction.update({
-      content: "❌ ZOMB could not remove that role. Check its role permissions and hierarchy.",
+    return interaction.editReply({
+      content:
+        "❌ ZOMB could not remove that role. Check its role permissions and hierarchy.",
       components: []
     });
   }
 }
+
   if (!interaction.isChatInputCommand()) return;
   if (interaction.commandName === "ping") {
     return interaction.reply({
