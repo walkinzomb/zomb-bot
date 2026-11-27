@@ -1946,10 +1946,7 @@ if (
       args.slice(1).join(" ").trim();
 
   await message.guild.roles.fetch();
-
-const search = roleInput.toLowerCase();
-
-const search = roleInput
+const roleSearch = roleInput
   .toLowerCase()
   .replace(/[‘’]/g, "'")
   .trim();
@@ -1962,8 +1959,8 @@ const matches = message.guild.roles.cache.filter(r => {
 
   return (
     r.id === roleInput ||
-    name.includes(search) ||
-    search.includes(name)
+    name.includes(roleSearch) ||
+    roleSearch.includes(name)
   );
 });
 
