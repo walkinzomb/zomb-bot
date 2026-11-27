@@ -1989,9 +1989,9 @@ const afkUserId = message.author.id;
 if (command === "~afk") {
   const reason = args.slice(1).join(" ") || "AFK";
 
-  afkUsers[guildId] ||= {};
+  afkUsers[afkGuildId] ||= {};
 
-  afkUsers[guildId][userId] = {
+  afkUsers[afkGuildId][afkUserId] = {
     reason,
     since: Date.now()
   };
@@ -2005,7 +2005,7 @@ if (command === "~afk") {
 
 // CHECK MENTIONED AFK USERS
 for (const mentionedUser of message.mentions.users.values()) {
-  const afkData = afkUsers[guildId]?.[mentionedUser.id];
+  const afkData = afkUsers[afkGuildId]?.[mentionedUser.id];
 
   if (afkData) {
     message.channel.send(
@@ -2015,7 +2015,7 @@ for (const mentionedUser of message.mentions.users.values()) {
 }
 
 // AUTOMATICALLY REMOVE AFK WHEN USER RETURNS
-const returningAfk = afkUsers[guildId]?.[userId];
+const returningAfk = afkUsers[afkGuildId]?.[afkUserId];
 
 if (returningAfk) {
   const awayTime = Date.now() - returningAfk.since;
@@ -2037,7 +2037,7 @@ if (returningAfk) {
     duration = `${seconds} second(s)`;
   }
 
-  delete afkUsers[guildId][userId];
+  delete afkUsers[afkGuildId][afkUserId];
   saveAfk();
 
   message.reply(
