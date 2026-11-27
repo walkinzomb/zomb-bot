@@ -2049,7 +2049,9 @@ if (
 // ==========================================
 
 if (command === "~inrole") {
-  const roleInput = args.slice(1).join(" ").trim();
+  const roleInput =
+    message.mentions.roles.first()?.id ||
+    args.slice(1).join(" ").trim();
 
   if (!roleInput) {
     return message.reply("Usage: `~inrole Role Name`");
