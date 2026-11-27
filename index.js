@@ -2010,12 +2010,7 @@ if (
     return message.reply("That role is above or equal to ZOMB's highest role.");
   }
 
-  if (
-    targetMember.id !== message.guild.ownerId &&
-    targetMember.roles.highest.position >= message.member.roles.highest.position
-  ) {
-    return message.reply("You cannot change roles for a member with an equal or higher role than yours.");
-  }
+ 
 
   if (targetMember.roles.cache.has(role.id)) {
     await targetMember.roles.remove(role);
@@ -2747,18 +2742,6 @@ if (command === "~jail" || command === "~unjail") {
     .fetch(moderationTargetId)
     .catch(() => null);
 
-  if (!target) {
-    return message.reply("That member is not in this server.");
-  }
-
-  if (
-    message.author.id !== message.guild.ownerId &&
-    target.roles.highest.position >= message.member.roles.highest.position
-  ) {
-    return message.reply(
-      "You cannot manage someone with an equal or higher role."
-    );
-  }
 
   const jailRoleId = antiNukeData.jailRoles[guildId];
   const jailChannelId = antiNukeData.jailChannels[guildId];
